@@ -1,0 +1,130 @@
+{% extends "base.html" %}
+{% block title %}Test Lab — LLVM DiffTester{% endblock %}
+
+{% block content %}
+<header class="page-header">
+  <h1>Test Lab</h1>
+  <p class="page-subtitle">Upload C source, mutate LLVM IR with an LLM, and run differential compiler tests.</p>
+</header>
+
+<!-- STEP 1 -->
+<section class="card step-card" id="step-1">
+  <div class="step-header">
+    <span class="step-badge">1</span>
+    <h2>Upload C File</h2>
+  </div>
+  <div class="drop-zone" id="drop-zone">
+    <i data-feather="upload-cloud"></i>
+    <p>Drag &amp; drop a <code>.c</code> file here, or click to browse</p>
+    <input type="file" id="c-file-input" accept=".c" hidden>
+  </div>
+  <div id="upload-status" class="upload-status hidden"></div>
+  <div id="ir-output-wrap" class="hidden">
+    <div class="code-header">
+      <span>Generated LLVM IR</span>
+      <button type="button" class="btn btn-sm" id="copy-ir-btn">Copy IR</button>
+    </div>
+    <pre id="ir-output" class="code-block"></pre>
+  </div>
+</section>
+
+<!-- STEP 2 -->
+<section class="card step-card" id="step-2">
+  <div class="step-header">
+    <span class="step-badge">2</span>
+    <h2>Choose Mutation Type</h2>
+  </div>
+  <div class="mutation-grid" id="mutation-grid">
+    {% for key, meta in mutation_types.items() %}
+    <label class="mutation-card" data-type="{{ key }}">
+      <input type="radio" name="mutation_type" value="{{ key }}">
+      <span class="mutation-label">{{ meta.label }}</span>
+      <span class="mutation-desc">{{ meta.description }}</span>
+    </label>
+    {% endfor %}
+  </div>
+</section>
+
+<!-- STEP 3 -->
+<section class="card step-card" id="step-3">
+  <div class="step-header">
+    <span class="step-badge">3</span>
+    <h2>Get LLM Prompt</h2>
+  </div>
+  <button type="button" class="btn btn-primary" id="generate-prompt-btn" disabled>Generate Prompt</button>
+  <div id="prompt-wrap" class="hidden">
+    <div class="code-header">
+      <span>LLM Prompt</span>
+      <button type="button" class="btn btn-sm" id="copy-prompt-btn">Copy Prompt</button>
+    </div>
+    <textarea id="prompt-output" class="prompt-textarea" readonly></textarea>
+    <p class="hint-text">Paste this prompt into Claude or GPT-4, then copy the returned LLVM IR and paste it below in Step 4.</p>
+  </div>
+</section>
+
+<!-- STEP 4 -->
+<section class="card step-card" id="step-4">
+  <div class="step-header">
+    <span class="step-badge">4</span>
+    <h2>Paste Mutated IR</h2>
+  </div>
+  <textarea id="mutated-ir-input" class="mutated-textarea" placeholder="Paste the mutated LLVM IR from your LLM here..."></textarea>
+  <button type="button" class="btn btn-primary" id="run-test-btn">Run Validation &amp; Testing</button>
+  <div id="status-bar" class="status-bar hidden">
+    <div class="phase" data-phase="verify">Verifying IR...</div>
+    <div class="phase" data-phase="o0">Running O0...</div>
+    <div class="phase" data-phase="o3">Running O3...</div>
+    <div class="phase" data-phase="compare">Comparing...</div>
+  </div>
+</section>
+
+<!-- STEP 5 -->
+<section class="card step-card hidden" id="step-5">
+  <div class="step-header">
+    <span class="step-badge">5</span>
+    <h2>Results</h2>
+  </div>
+  <div id="results-panel"></div>
+</section>
+
+<!-- STEP 6 -->
+<section class="card step-card" id="step-6">
+  <div class="step-header">
+    <span class="step-badge">6</span>
+    <h2>History</h2>
+    <button type="button" class="btn btn-sm" id="refresh-history-btn">Refresh</button>
+  </div>
+  <div class="table-wrap">
+    <table class="history-table" id="history-table">
+      <thead>
+        <tr>
+          <th>#</th>
+          <th>Date</th>
+          <th>File</th>
+          <th>Mutation</th>
+          <th>Valid</th>
+          <th>Match</th>
+          <th>Interesting</th>
+        </tr>
+      </thead>
+      <tbody id="history-tbody"></tbody>
+    </table>
+  </div>
+</section>
+
+<!-- Modal -->
+<div id="run-modal" class="modal hidden">
+  <div class="modal-backdrop" id="modal-backdrop"></div>
+  <div class="modal-card">
+    <div class="modal-header">
+      <h3>Run Details <span id="modal-run-id"></span></h3>
+      <button type="button" class="modal-close" id="modal-close">&times;</button>
+    </div>
+    <div class="modal-body" id="modal-body"></div>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="{{ url_for('static', filename='js/main.js') }}"></script>
+{% endblock %}

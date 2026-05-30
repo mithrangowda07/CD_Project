@@ -1,0 +1,36 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>{% block title %}LLVM DiffTester{% endblock %}</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+  <script src="https://cdn.jsdelivr.net/npm/feather-icons/dist/feather.min.js"></script>
+  {% block head %}{% endblock %}
+</head>
+<body>
+  <nav class="sidebar">
+    <div class="sidebar-logo">
+      <span class="logo-icon">⚙</span>
+      <span>LLVM DiffTester</span>
+    </div>
+    <ul class="nav-links">
+      <li><a href="/" class="{{ 'active' if request.path == '/' else '' }}">
+        <i data-feather="cpu"></i> Test Lab
+      </a></li>
+      <li><a href="/analysis" class="{{ 'active' if request.path == '/analysis' else '' }}">
+        <i data-feather="bar-chart-2"></i> Analysis
+      </a></li>
+    </ul>
+    <div class="sidebar-footer">LLVM IR Fuzzing Research</div>
+  </nav>
+  <main class="main-content">
+    {% block content %}{% endblock %}
+  </main>
+  <script>feather.replace()</script>
+  {% block scripts %}{% endblock %}
+</body>
+</html>

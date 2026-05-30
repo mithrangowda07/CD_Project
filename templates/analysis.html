@@ -1,0 +1,74 @@
+{% extends "base.html" %}
+{% block title %}Analysis — LLVM DiffTester{% endblock %}
+
+{% block head %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js"></script>
+{% endblock %}
+
+{% block content %}
+<header class="page-header">
+  <h1>Analysis</h1>
+  <p class="page-subtitle">Aggregated statistics from all stored test runs.</p>
+</header>
+
+<div id="analysis-loading" class="analysis-loading">
+  <div class="spinner"></div>
+  <span>Loading statistics...</span>
+</div>
+
+<div id="analysis-content" class="hidden">
+  <div class="kpi-grid" id="kpi-grid"></div>
+
+  <div class="charts-grid">
+    <div class="chart-card">
+      <h3>IR Validity Breakdown</h3>
+      <div class="chart-container">
+        <canvas id="chart-validity"></canvas>
+        <p class="no-data-msg hidden" id="no-data-validity">No data yet</p>
+      </div>
+    </div>
+    <div class="chart-card">
+      <h3>Valid vs Invalid by Mutation Type</h3>
+      <div class="chart-container">
+        <canvas id="chart-mutation"></canvas>
+        <p class="no-data-msg hidden" id="no-data-mutation">No data yet</p>
+      </div>
+    </div>
+  </div>
+
+  <div class="charts-grid">
+    <div class="chart-card">
+      <h3>Error Type Distribution (Invalid Cases)</h3>
+      <div class="chart-container">
+        <canvas id="chart-errors"></canvas>
+        <p class="no-data-msg hidden" id="no-data-errors">No data yet</p>
+      </div>
+    </div>
+    <div class="chart-card">
+      <h3>Test Runs Over Time</h3>
+      <div class="chart-container">
+        <canvas id="chart-timeline"></canvas>
+        <p class="no-data-msg hidden" id="no-data-timeline">No data yet</p>
+      </div>
+    </div>
+  </div>
+
+  <div class="chart-card chart-full">
+    <h3>LLM Validity Rate by Mutation Type (%)</h3>
+    <p class="chart-subtitle">Higher = LLM more reliably produces valid IR for this mutation</p>
+    <div class="chart-container">
+      <canvas id="chart-usefulness"></canvas>
+      <p class="no-data-msg hidden" id="no-data-usefulness">No data yet</p>
+    </div>
+  </div>
+
+  <div class="findings-box" id="key-findings">
+    <h3>Key Findings</h3>
+    <div id="findings-text"></div>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="{{ url_for('static', filename='js/analysis.js') }}"></script>
+{% endblock %}
