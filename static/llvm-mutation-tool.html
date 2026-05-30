@@ -1,0 +1,1183 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>LLVM IR Mutation Comparison Tool</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;500;600&family=Space+Grotesk:wght@300;400;500;600;700&display=swap');
+
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+  --bg0: #080b10;
+  --bg1: #0e1117;
+  --bg2: #141820;
+  --bg3: #1c2233;
+  --bg4: #232b3e;
+  --border: #2a3350;
+  --border2: #3a4a6b;
+  --text: #d4daf0;
+  --text2: #8896b8;
+  --text3: #4a5878;
+  --accent: #4f8ef7;
+  --accent2: #7c6af7;
+  --green: #3dd68c;
+  --red: #f76f6f;
+  --amber: #f7b94f;
+  --teal: #3dcfcf;
+  --pink: #f76fbe;
+  --mono: 'JetBrains Mono', monospace;
+  --sans: 'Space Grotesk', sans-serif;
+  --r: 8px;
+  --r2: 12px;
+}
+
+html { scroll-behavior: smooth; }
+body { background: var(--bg0); color: var(--text); font-family: var(--sans); font-size: 14px; line-height: 1.6; min-height: 100vh; overflow-x: hidden; }
+
+/* SCROLLBAR */
+::-webkit-scrollbar { width: 5px; height: 5px; }
+::-webkit-scrollbar-track { background: var(--bg1); }
+::-webkit-scrollbar-thumb { background: var(--border2); border-radius: 3px; }
+
+/* HEADER */
+.header {
+  background: linear-gradient(135deg, #0a0f1e 0%, #0d1528 50%, #0a0f1e 100%);
+  border-bottom: 1px solid var(--border);
+  padding: 2.5rem 2rem 2rem;
+  text-align: center;
+  position: relative;
+  overflow: hidden;
+}
+.header::before {
+  content: '';
+  position: absolute; inset: 0;
+  background: radial-gradient(ellipse 60% 80% at 50% -20%, rgba(79,142,247,.12) 0%, transparent 60%);
+  pointer-events: none;
+}
+.header-badge {
+  display: inline-block;
+  font-family: var(--mono);
+  font-size: 10px;
+  letter-spacing: .12em;
+  text-transform: uppercase;
+  color: var(--accent);
+  background: rgba(79,142,247,.1);
+  border: 1px solid rgba(79,142,247,.25);
+  padding: 4px 12px;
+  border-radius: 20px;
+  margin-bottom: 1rem;
+}
+.header h1 {
+  font-size: clamp(20px, 3vw, 28px);
+  font-weight: 700;
+  color: #fff;
+  letter-spacing: -.02em;
+  margin-bottom: .4rem;
+}
+.header h1 span { color: var(--accent); }
+.header p { color: var(--text2); font-size: 14px; }
+
+/* LAYOUT */
+.container { max-width: 1400px; margin: 0 auto; padding: 1.5rem; }
+.section { margin-bottom: 2rem; }
+.section-title {
+  font-family: var(--mono);
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: .1em;
+  text-transform: uppercase;
+  color: var(--text3);
+  margin-bottom: 1rem;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.section-title::after { content: ''; flex: 1; height: 1px; background: var(--border); }
+.section-title span { color: var(--accent); margin-right: 4px; }
+
+/* PANELS */
+.panel {
+  background: var(--bg2);
+  border: 1px solid var(--border);
+  border-radius: var(--r2);
+  overflow: hidden;
+  transition: border-color .2s;
+}
+.panel:hover { border-color: var(--border2); }
+.panel-header {
+  padding: .75rem 1rem;
+  background: var(--bg3);
+  border-bottom: 1px solid var(--border);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  cursor: pointer;
+  user-select: none;
+}
+.panel-header:hover { background: var(--bg4); }
+.panel-title { font-family: var(--mono); font-size: 12px; font-weight: 500; color: var(--text2); display: flex; align-items: center; gap: 8px; }
+.panel-chevron { color: var(--text3); font-size: 12px; transition: transform .2s; }
+.panel.collapsed .panel-chevron { transform: rotate(-90deg); }
+.panel.collapsed .panel-body { display: none; }
+.panel-body { padding: 1rem; }
+
+/* INPUTS */
+.input-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; }
+@media(max-width:900px) { .input-grid { grid-template-columns: 1fr; } }
+
+.input-label {
+  font-family: var(--mono);
+  font-size: 11px;
+  color: var(--text3);
+  text-transform: uppercase;
+  letter-spacing: .08em;
+  margin-bottom: .4rem;
+}
+.ir-textarea {
+  width: 100%;
+  background: var(--bg0);
+  border: 1px solid var(--border);
+  color: var(--teal);
+  font-family: var(--mono);
+  font-size: 12px;
+  line-height: 1.7;
+  padding: .75rem;
+  border-radius: var(--r);
+  resize: vertical;
+  min-height: 180px;
+  outline: none;
+  transition: border-color .2s;
+  tab-size: 2;
+}
+.ir-textarea:focus { border-color: var(--accent); }
+.ir-textarea::placeholder { color: var(--text3); }
+
+/* BUTTONS */
+.btn-row { display: flex; flex-wrap: wrap; gap: .6rem; margin-top: 1rem; }
+.btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 16px;
+  border-radius: var(--r);
+  border: 1px solid;
+  font-family: var(--mono);
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all .15s;
+  outline: none;
+  white-space: nowrap;
+}
+.btn:active { transform: scale(.97); }
+.btn-primary { background: rgba(79,142,247,.12); border-color: rgba(79,142,247,.4); color: var(--accent); }
+.btn-primary:hover { background: rgba(79,142,247,.2); border-color: var(--accent); }
+.btn-purple { background: rgba(124,106,247,.12); border-color: rgba(124,106,247,.4); color: var(--accent2); }
+.btn-purple:hover { background: rgba(124,106,247,.2); border-color: var(--accent2); }
+.btn-green { background: rgba(61,214,140,.1); border-color: rgba(61,214,140,.35); color: var(--green); }
+.btn-green:hover { background: rgba(61,214,140,.18); border-color: var(--green); }
+.btn-ghost { background: transparent; border-color: var(--border); color: var(--text2); }
+.btn-ghost:hover { background: var(--bg3); border-color: var(--border2); color: var(--text); }
+.btn-danger { background: rgba(247,111,111,.1); border-color: rgba(247,111,111,.3); color: var(--red); }
+.btn-danger:hover { background: rgba(247,111,111,.18); }
+
+/* MUTATION CARDS GRID */
+.mutation-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 1rem; }
+@media(max-width:1200px) { .mutation-grid { grid-template-columns: repeat(2, 1fr); } }
+@media(max-width:600px) { .mutation-grid { grid-template-columns: 1fr; } }
+
+.mutation-card {
+  background: var(--bg2);
+  border-radius: var(--r2);
+  border: 1px solid var(--border);
+  overflow: hidden;
+  transition: border-color .2s, transform .2s;
+}
+.mutation-card:hover { border-color: var(--border2); transform: translateY(-2px); }
+.card-header {
+  padding: .6rem 1rem;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  border-bottom: 1px solid var(--border);
+}
+.card-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+.card-title { font-family: var(--mono); font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: .08em; }
+.card-body-ir { padding: .75rem; background: var(--bg0); max-height: 280px; overflow-y: auto; }
+.card-body-ir pre { font-family: var(--mono); font-size: 11px; line-height: 1.8; white-space: pre-wrap; word-break: break-all; }
+.empty-ir { color: var(--text3); font-family: var(--mono); font-size: 11px; padding: 2rem; text-align: center; }
+
+/* SYNTAX HIGHLIGHTING */
+.kw { color: #c792ea; }
+.ty { color: #82aaff; }
+.fn { color: #ffcb6b; }
+.num { color: #f78c6c; }
+.cm { color: #546e7a; font-style: italic; }
+.lb { color: var(--teal); }
+.op { color: #f07178; }
+.reg { color: #c3e88d; }
+.str { color: #c3e88d; }
+
+/* METRICS TABLE */
+.metrics-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+.metrics-table th {
+  background: var(--bg3);
+  color: var(--text2);
+  font-family: var(--mono);
+  font-size: 11px;
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: .06em;
+  padding: 10px 14px;
+  text-align: left;
+  border-bottom: 1px solid var(--border);
+}
+.metrics-table th:not(:first-child) { text-align: center; }
+.metrics-table td { padding: 9px 14px; border-bottom: 1px solid rgba(42,51,80,.5); color: var(--text2); vertical-align: middle; }
+.metrics-table td:first-child { font-family: var(--mono); font-size: 12px; color: var(--text3); }
+.metrics-table td:not(:first-child) { text-align: center; }
+.metrics-table tr:hover td { background: rgba(255,255,255,.02); }
+.metric-val { font-family: var(--mono); font-weight: 600; color: var(--text); }
+.metric-best { color: var(--green); }
+
+/* VALIDATION BADGES */
+.badge-row { display: flex; flex-wrap: wrap; gap: 6px; }
+.badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 3px 9px;
+  border-radius: 4px;
+  font-family: var(--mono);
+  font-size: 11px;
+  font-weight: 500;
+}
+.badge-pass { background: rgba(61,214,140,.12); color: var(--green); border: 1px solid rgba(61,214,140,.3); }
+.badge-fail { background: rgba(247,111,111,.1); color: var(--red); border: 1px solid rgba(247,111,111,.25); }
+.badge-warn { background: rgba(247,185,79,.1); color: var(--amber); border: 1px solid rgba(247,185,79,.25); }
+
+/* PROGRESS BARS */
+.progress-row { display: flex; align-items: center; gap: 10px; margin-bottom: .75rem; }
+.progress-label { font-family: var(--mono); font-size: 11px; color: var(--text2); width: 180px; flex-shrink: 0; }
+.progress-bar-wrap { flex: 1; background: var(--bg3); border-radius: 10px; height: 8px; overflow: hidden; }
+.progress-bar { height: 100%; border-radius: 10px; transition: width .6s cubic-bezier(.4,0,.2,1); }
+.progress-val { font-family: var(--mono); font-size: 11px; color: var(--text2); width: 36px; text-align: right; flex-shrink: 0; }
+
+/* CFG DIAGRAM */
+.cfg-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 1rem; }
+@media(max-width:1200px) { .cfg-grid { grid-template-columns: repeat(2, 1fr); } }
+@media(max-width:600px) { .cfg-grid { grid-template-columns: 1fr; } }
+
+.cfg-card { background: var(--bg2); border: 1px solid var(--border); border-radius: var(--r2); padding: 1rem; }
+.cfg-card-title { font-family: var(--mono); font-size: 11px; text-transform: uppercase; letter-spacing: .08em; margin-bottom: 1rem; text-align: center; }
+.cfg-diagram { display: flex; flex-direction: column; align-items: center; gap: 0; }
+.cfg-node {
+  padding: 6px 14px;
+  border-radius: 6px;
+  font-family: var(--mono);
+  font-size: 11px;
+  font-weight: 500;
+  text-align: center;
+  white-space: nowrap;
+  min-width: 80px;
+}
+.cfg-entry { background: rgba(79,142,247,.15); border: 1px solid rgba(79,142,247,.4); color: var(--accent); }
+.cfg-block { background: rgba(61,207,207,.1); border: 1px solid rgba(61,207,207,.3); color: var(--teal); }
+.cfg-branch { background: rgba(247,185,79,.1); border: 1px solid rgba(247,185,79,.3); color: var(--amber); }
+.cfg-exit { background: rgba(61,214,140,.1); border: 1px solid rgba(61,214,140,.3); color: var(--green); }
+.cfg-arrow { color: var(--text3); font-family: var(--mono); font-size: 14px; line-height: 1; padding: 2px 0; }
+.cfg-parallel { display: flex; gap: 8px; align-items: flex-start; }
+.cfg-parallel-col { display: flex; flex-direction: column; align-items: center; gap: 0; }
+.cfg-merge { display: flex; align-items: center; gap: 4px; font-family: var(--mono); font-size: 10px; color: var(--text3); }
+
+/* CONCLUSION */
+.conclusion-box {
+  background: var(--bg2);
+  border: 1px solid var(--border);
+  border-left: 3px solid var(--accent);
+  border-radius: var(--r2);
+  padding: 1.25rem 1.5rem;
+}
+.conclusion-text { font-size: 14px; color: var(--text2); line-height: 1.8; }
+.conclusion-text strong { color: var(--text); font-weight: 600; }
+
+/* SCORE CELLS in evaluation */
+.eval-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1rem; margin-bottom: 1rem; }
+@media(max-width:800px) { .eval-grid { grid-template-columns: 1fr; } }
+.eval-card { background: var(--bg3); border: 1px solid var(--border); border-radius: var(--r); padding: 1rem; }
+.eval-card-title { font-family: var(--mono); font-size: 11px; text-transform: uppercase; letter-spacing: .07em; color: var(--text3); margin-bottom: .5rem; }
+.eval-card-name { font-size: 13px; font-weight: 600; color: var(--text); margin-bottom: .75rem; }
+
+/* VALIDATION GRID */
+.val-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 1rem; }
+@media(max-width:1000px) { .val-grid { grid-template-columns: repeat(2, 1fr); } }
+
+.val-card { background: var(--bg2); border: 1px solid var(--border); border-radius: var(--r2); overflow: hidden; }
+.val-card-title { padding: .6rem 1rem; background: var(--bg3); border-bottom: 1px solid var(--border); font-family: var(--mono); font-size: 11px; text-transform: uppercase; letter-spacing: .07em; color: var(--text2); }
+.val-card-body { padding: .75rem 1rem; }
+
+/* FLASH ANIMATION */
+@keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.5} }
+.loading { animation: pulse 1s infinite; color: var(--text3); font-family: var(--mono); font-size: 12px; padding: 1rem; text-align: center; }
+
+/* DIVIDER */
+hr { border: none; border-top: 1px solid var(--border); margin: 1.5rem 0; }
+
+/* DIFF HIGHLIGHT */
+.diff-add { background: rgba(61,214,140,.08); color: var(--green); }
+.diff-del { background: rgba(247,111,111,.08); color: var(--red); text-decoration: line-through; opacity: .6; }
+
+/* TOOLTIP */
+[data-tip] { position: relative; cursor: help; }
+[data-tip]::after {
+  content: attr(data-tip);
+  position: absolute;
+  bottom: calc(100% + 6px);
+  left: 50%;
+  transform: translateX(-50%);
+  background: var(--bg4);
+  border: 1px solid var(--border2);
+  color: var(--text);
+  font-family: var(--mono);
+  font-size: 11px;
+  padding: 4px 8px;
+  border-radius: 4px;
+  white-space: nowrap;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity .15s;
+  z-index: 10;
+}
+[data-tip]:hover::after { opacity: 1; }
+
+/* STATUS BAR */
+.status-bar {
+  position: fixed;
+  bottom: 0; left: 0; right: 0;
+  background: var(--bg2);
+  border-top: 1px solid var(--border);
+  padding: 6px 1.5rem;
+  display: flex;
+  align-items: center;
+  gap: 1.5rem;
+  font-family: var(--mono);
+  font-size: 11px;
+  color: var(--text3);
+  z-index: 50;
+}
+.status-item { display: flex; align-items: center; gap: 5px; }
+.status-dot { width: 6px; height: 6px; border-radius: 50%; }
+.status-dot.green { background: var(--green); box-shadow: 0 0 6px var(--green); }
+.status-dot.gray { background: var(--text3); }
+
+body { padding-bottom: 36px; }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <div class="header-badge">research · compiler analysis</div>
+  <h1>LLVM IR <span>Mutation Comparison</span> Tool</h1>
+  <p>Compare LLM, Random, and Grammar-Based LLVM IR Mutations — No Backend Required</p>
+</div>
+
+<div class="container">
+
+<!-- SECTION 2: INPUT -->
+<div class="section">
+  <div class="section-title"><span>§1</span> Input Area</div>
+  <div class="panel">
+    <div class="panel-header" onclick="togglePanel(this)">
+      <span class="panel-title">📄 Paste LLVM IR Test Cases</span>
+      <span class="panel-chevron">▾</span>
+    </div>
+    <div class="panel-body">
+      <div class="input-grid">
+        <div>
+          <div class="input-label">Original LLVM IR Test Case</div>
+          <textarea class="ir-textarea" id="ir-original" placeholder="; Paste your original LLVM IR here&#10;define i32 @example(i32 %a, i32 %b) {&#10;entry:&#10;  %sum = add i32 %a, %b&#10;  ret i32 %sum&#10;}" spellcheck="false"></textarea>
+        </div>
+        <div>
+          <div class="input-label">LLM Mutated LLVM IR</div>
+          <textarea class="ir-textarea" id="ir-llm" placeholder="; Paste LLM-generated mutation here&#10;define i32 @example(i32 %a, i32 %b) {&#10;entry:&#10;  %sum = mul i32 %a, %b&#10;  ret i32 %sum&#10;}" spellcheck="false"></textarea>
+        </div>
+      </div>
+      <div class="btn-row">
+        <button class="btn btn-primary" onclick="generateRandom()">⚡ Generate Random Mutation</button>
+        <button class="btn btn-purple" onclick="generateGrammar()">🔧 Generate Grammar Mutation</button>
+        <button class="btn btn-green" onclick="analyzeAll()">📊 Analyze All Mutations</button>
+        <button class="btn btn-danger" onclick="resetAll()">✕ Reset</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- SECTION 3: MUTATION DISPLAY -->
+<div class="section">
+  <div class="section-title"><span>§2</span> Mutation Cards</div>
+  <div class="mutation-grid">
+    <div class="mutation-card" id="card-original">
+      <div class="card-header">
+        <div class="card-dot" style="background:#82aaff"></div>
+        <span class="card-title" style="color:#82aaff">Original IR</span>
+      </div>
+      <div class="card-body-ir" id="display-original"><div class="empty-ir">Paste original IR above</div></div>
+    </div>
+    <div class="mutation-card" id="card-llm">
+      <div class="card-header">
+        <div class="card-dot" style="background:#c792ea"></div>
+        <span class="card-title" style="color:#c792ea">LLM Mutation</span>
+      </div>
+      <div class="card-body-ir" id="display-llm"><div class="empty-ir">Paste LLM mutation above</div></div>
+    </div>
+    <div class="mutation-card" id="card-random">
+      <div class="card-header">
+        <div class="card-dot" style="background:#f7b94f"></div>
+        <span class="card-title" style="color:#f7b94f">Random Mutation</span>
+      </div>
+      <div class="card-body-ir" id="display-random"><div class="empty-ir">Click "Generate Random Mutation"</div></div>
+    </div>
+    <div class="mutation-card" id="card-grammar">
+      <div class="card-header">
+        <div class="card-dot" style="background:#3dd68c"></div>
+        <span class="card-title" style="color:#3dd68c">Grammar Mutation</span>
+      </div>
+      <div class="card-body-ir" id="display-grammar"><div class="empty-ir">Click "Generate Grammar Mutation"</div></div>
+    </div>
+  </div>
+</div>
+
+<!-- SECTION 4+5: ANALYSIS & VALIDATION -->
+<div class="section" id="analysis-section" style="display:none">
+  <div class="section-title"><span>§3</span> IR Analysis Engine</div>
+
+  <div class="val-grid" id="validation-grid" style="margin-bottom:1rem">
+    <!-- filled by JS -->
+  </div>
+
+  <div class="panel">
+    <div class="panel-header" onclick="togglePanel(this)">
+      <span class="panel-title">📋 Instruction Metrics</span>
+      <span class="panel-chevron">▾</span>
+    </div>
+    <div class="panel-body" style="overflow-x:auto">
+      <table class="metrics-table" id="metrics-table">
+        <thead>
+          <tr>
+            <th>Metric</th>
+            <th style="color:#82aaff">Original</th>
+            <th style="color:#c792ea">LLM</th>
+            <th style="color:#f7b94f">Random</th>
+            <th style="color:#3dd68c">Grammar</th>
+          </tr>
+        </thead>
+        <tbody id="metrics-body"></tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<!-- SECTION 6: COMPARISON DASHBOARD -->
+<div class="section" id="comparison-section" style="display:none">
+  <div class="section-title"><span>§4</span> Comparison Dashboard</div>
+  <div class="panel">
+    <div class="panel-header" onclick="togglePanel(this)">
+      <span class="panel-title">📊 Full Comparison Table</span>
+      <span class="panel-chevron">▾</span>
+    </div>
+    <div class="panel-body" style="overflow-x:auto">
+      <table class="metrics-table" id="comparison-table">
+        <thead>
+          <tr>
+            <th>Metric</th>
+            <th style="color:#c792ea">LLM</th>
+            <th style="color:#f7b94f">Random</th>
+            <th style="color:#3dd68c">Grammar</th>
+          </tr>
+        </thead>
+        <tbody id="comparison-body"></tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<!-- SECTION 7: RESEARCH EVALUATION -->
+<div class="section" id="eval-section" style="display:none">
+  <div class="section-title"><span>§5</span> Research Evaluation</div>
+  <div class="eval-grid" id="eval-cards"></div>
+  <div class="panel">
+    <div class="panel-header" onclick="togglePanel(this)">
+      <span class="panel-title">📈 Evaluation Scores</span>
+      <span class="panel-chevron">▾</span>
+    </div>
+    <div class="panel-body" id="eval-bars"></div>
+  </div>
+</div>
+
+<!-- SECTION 8: TRADITIONAL vs LLM -->
+<div class="section" id="final-table-section" style="display:none">
+  <div class="section-title"><span>§6</span> Traditional vs LLM Comparison</div>
+  <div class="panel">
+    <div class="panel-header" onclick="togglePanel(this)">
+      <span class="panel-title">🔬 Final Research Report</span>
+      <span class="panel-chevron">▾</span>
+    </div>
+    <div class="panel-body" style="overflow-x:auto">
+      <table class="metrics-table" id="final-table">
+        <thead>
+          <tr>
+            <th>Metric</th>
+            <th style="color:#c792ea">LLM</th>
+            <th style="color:#f7b94f">Random</th>
+            <th style="color:#3dd68c">Grammar</th>
+          </tr>
+        </thead>
+        <tbody id="final-body"></tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<!-- SECTION 9: CFG SUMMARY -->
+<div class="section" id="cfg-section" style="display:none">
+  <div class="section-title"><span>§7</span> Visual CFG Summary</div>
+  <div class="cfg-grid" id="cfg-grid"></div>
+</div>
+
+<!-- SECTION 10: CONCLUSION -->
+<div class="section" id="conclusion-section" style="display:none">
+  <div class="section-title"><span>§8</span> Research Conclusion</div>
+  <div class="conclusion-box">
+    <div class="conclusion-text" id="conclusion-text"></div>
+  </div>
+</div>
+
+</div><!-- /container -->
+
+<div class="status-bar">
+  <span class="status-item"><span class="status-dot" id="status-dot" style="background:var(--text3)"></span><span id="status-text">Ready — paste IR and generate mutations</span></span>
+  <span class="status-item" id="status-counts"></span>
+</div>
+
+<script>
+// ─── STATE ──────────────────────────────────────────────────────────────────
+const state = {
+  original: '', llm: '', random: '', grammar: '',
+  metrics: {}, analyzed: false
+};
+
+// ─── SYNTAX HIGHLIGHTER ─────────────────────────────────────────────────────
+function highlight(code) {
+  if (!code || !code.trim()) return '<span style="color:var(--text3)">; (empty)</span>';
+  const esc = s => s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+  const lines = code.split('\n');
+  return lines.map(line => {
+    let l = esc(line);
+    // comments
+    if (/^\s*;/.test(line)) return `<span class="cm">${l}</span>`;
+    // labels
+    if (/^\s*\w[\w.]*:$/.test(line.trim())) return `<span class="lb">${l}</span>`;
+    // keywords
+    const kws = ['define','declare','ret','br','call','load','store','alloca','phi','getelementptr','bitcast','trunc','zext','sext','fpext','fptrunc','sitofp','fptosi','ptrtoint','inttoptr','unreachable','switch','indirectbr','invoke','resume','landingpad','to','label','align','global','constant','type','external','internal','private','dso_local','unnamed_addr','nounwind','uwtable','readnone','willreturn','mustprogress','nsw','nuw','exact','inbounds'];
+    const types = ['i1','i8','i16','i32','i64','i128','float','double','void','ptr','i8\\*','i32\\*','i64\\*'];
+    const arith = ['add','sub','mul','udiv','sdiv','urem','srem','fadd','fsub','fmul','fdiv','frem','shl','lshr','ashr','and','or','xor','icmp','fcmp','select'];
+    const cmps = ['eq','ne','slt','sgt','sle','sge','ult','ugt','ule','uge','oeq','one','olt','ogt','ole','oge'];
+
+    types.forEach(t => { l = l.replace(new RegExp(`\\b(${t})\\b`,'g'), '<span class="ty">$1</span>'); });
+    kws.forEach(k => { l = l.replace(new RegExp(`\\b(${k})\\b`,'g'), '<span class="kw">$1</span>'); });
+    arith.forEach(a => { l = l.replace(new RegExp(`\\b(${a})\\b`,'g'), '<span class="op">$1</span>'); });
+    cmps.forEach(c => { l = l.replace(new RegExp(`\\b(${c})\\b`,'g'), '<span class="fn">$1</span>'); });
+    // SSA registers
+    l = l.replace(/(%[\w.]+)/g, '<span class="reg">$1</span>');
+    // @functions
+    l = l.replace(/(@[\w.]+)/g, '<span class="fn">$1</span>');
+    // numbers
+    l = l.replace(/\b(\d+)\b/g, '<span class="num">$1</span>');
+    return l;
+  }).join('\n');
+}
+
+// ─── DISPLAY CARD ────────────────────────────────────────────────────────────
+function displayIR(containerId, code) {
+  const el = document.getElementById(containerId);
+  if (!code || !code.trim()) {
+    el.innerHTML = '<div class="empty-ir">No IR available</div>';
+    return;
+  }
+  el.innerHTML = `<pre>${highlight(code)}</pre>`;
+}
+
+// Update displays when user types
+document.getElementById('ir-original').addEventListener('input', function() {
+  state.original = this.value;
+  displayIR('display-original', this.value);
+  setStatus('gray', 'Original IR updated');
+});
+document.getElementById('ir-llm').addEventListener('input', function() {
+  state.llm = this.value;
+  displayIR('display-llm', this.value);
+  setStatus('gray', 'LLM mutation updated');
+});
+
+// ─── RANDOM MUTATION ENGINE ──────────────────────────────────────────────────
+function generateRandom() {
+  const src = state.original || document.getElementById('ir-original').value;
+  if (!src.trim()) { alert('Please paste an Original IR first.'); return; }
+  state.original = src;
+  displayIR('display-original', src);
+
+  const mutations = [
+    [/\badd\b/g, 'mul'],
+    [/\bmul\b/g, 'add'],
+    [/\bsub\b/g, 'xor'],
+    [/\bxor\b/g, 'sub'],
+    [/\bicmp eq\b/g, 'icmp ne'],
+    [/\bicmp ne\b/g, 'icmp eq'],
+    [/\bicmp slt\b/g, 'icmp sgt'],
+    [/\bicmp sgt\b/g, 'icmp slt'],
+    [/\bicmp ule\b/g, 'icmp uge'],
+    [/\bicmp uge\b/g, 'icmp ule'],
+    [/\bsdiv\b/g, 'udiv'],
+    [/\budiv\b/g, 'sdiv'],
+    [/\bsrem\b/g, 'urem'],
+    [/\blshr\b/g, 'ashr'],
+    [/\bashr\b/g, 'lshr'],
+    [/\bfadd\b/g, 'fsub'],
+    [/\bfsub\b/g, 'fadd'],
+    [/\bfmul\b/g, 'fdiv'],
+    [/\bor\b/g, 'and'],
+    [/\band\b/g, 'or'],
+  ];
+
+  let mutated = src;
+  let applied = 0;
+  // Apply 1-3 random mutations
+  const shuffled = mutations.sort(() => Math.random() - .5);
+  for (const [from, to] of shuffled) {
+    if (from.test(mutated)) {
+      mutated = mutated.replace(from, to);
+      applied++;
+      if (applied >= 2) break;
+    }
+  }
+
+  // Randomly negate a constant occasionally
+  if (Math.random() > .5) {
+    mutated = mutated.replace(/\b(\d{1,4})\b(?![\w:])/g, (m, n) => {
+      if (Math.random() > .85 && n !== '0') return String(parseInt(n) + 1);
+      return m;
+    });
+  }
+
+  state.random = mutated;
+  displayIR('display-random', mutated);
+  setStatus('green', `Random mutation applied (${applied} substitution${applied!==1?'s':''})`);
+}
+
+// ─── GRAMMAR-BASED MUTATION ENGINE ───────────────────────────────────────────
+function generateGrammar() {
+  const src = state.original || document.getElementById('ir-original').value;
+  if (!src.trim()) { alert('Please paste an Original IR first.'); return; }
+  state.original = src;
+
+  // Parse first function body
+  const funcMatch = src.match(/(define[^\{]+\{)([\s\S]*?)(\}[^\{]*?)$/);
+  if (!funcMatch) {
+    // Fallback: append a new block
+    state.grammar = src + '\n; [grammar: no function found, kept original]\n';
+    displayIR('display-grammar', state.grammar);
+    return;
+  }
+
+  const prefix = funcMatch[1];
+  const body = funcMatch[2];
+  const suffix = funcMatch[3];
+
+  // Extract existing SSA regs
+  const regs = [...new Set([...body.matchAll(/%(\w+)\s*=/g)].map(m => m[1]))];
+  const getType = () => ['i32','i64','i8','i1','i32'][Math.floor(Math.random()*4)];
+  const freshName = () => `%_g${Math.floor(Math.random()*9000+1000)}`;
+
+  let additions = [];
+
+  // 1. Insert an SSA arithmetic instruction using existing regs
+  if (regs.length >= 2) {
+    const r1 = `%${regs[Math.floor(Math.random()*regs.length)]}`;
+    const r2 = `%${regs[Math.floor(Math.random()*regs.length)]}`;
+    const t = 'i32';
+    const ops = ['add','sub','and','or','xor'];
+    const op = ops[Math.floor(Math.random()*ops.length)];
+    const name = freshName();
+    additions.push(`  ${name} = ${op} ${t} ${r1}, ${r2}   ; [grammar: inserted ${op}]`);
+  } else {
+    // use constants
+    const name = freshName();
+    additions.push(`  ${name} = add i32 0, 0   ; [grammar: inserted constant arithmetic]`);
+  }
+
+  // 2. Insert a comparison
+  const cmpName = freshName();
+  const cmpOps = ['icmp eq','icmp ne','icmp slt','icmp sgt'];
+  const cmpOp = cmpOps[Math.floor(Math.random()*cmpOps.length)];
+  if (regs.length >= 1) {
+    const r = `%${regs[0]}`;
+    additions.push(`  ${cmpName} = ${cmpOp} i32 ${r}, 0   ; [grammar: inserted comparison]`);
+  } else {
+    additions.push(`  ${cmpName} = icmp eq i32 0, 0   ; [grammar: inserted comparison]`);
+  }
+
+  // 3. Insert a new basic block with a branch before first ret
+  const retIdx = body.lastIndexOf('ret ');
+  let newBody;
+  if (retIdx !== -1) {
+    const beforeRet = body.slice(0, retIdx);
+    const retLine = body.slice(retIdx);
+    const insertBlock = `\n  ; [grammar: new SSA variable block]\n${additions.join('\n')}\n`;
+    const branchBlock = `\n_grammar_check:\n  ; grammar-added block\n  br label %_grammar_exit\n_grammar_exit:\n`;
+    newBody = beforeRet + insertBlock + retLine;
+  } else {
+    newBody = body + additions.join('\n') + '\n';
+  }
+
+  state.grammar = prefix + newBody + suffix;
+  displayIR('display-grammar', state.grammar);
+  setStatus('green', 'Grammar-based mutation generated');
+}
+
+// ─── ANALYSIS ENGINE ─────────────────────────────────────────────────────────
+function analyzeIR(code) {
+  if (!code || !code.trim()) return null;
+  const lines = code.split('\n');
+  const countInstr = (re) => lines.filter(l => re.test(l)).length;
+
+  const add = countInstr(/\badd\b/);
+  const sub = countInstr(/\bsub\b/);
+  const mul = countInstr(/\bmul\b/);
+  const div = countInstr(/\b[su]div\b/);
+  const icmp = countInstr(/\bicmp\b/);
+  const phi = countInstr(/\bphi\b/);
+  const br = countInstr(/\bbr\b/);
+  const ret = countInstr(/\bret\b/);
+  const load = countInstr(/\bload\b/);
+  const store = countInstr(/\bstore\b/);
+  const call = countInstr(/\bcall\b/);
+  const allInstr = add+sub+mul+div+icmp+phi+br+ret+load+store+call;
+
+  const blocks = lines.filter(l => /^\s*[\w.]+:\s*$/.test(l.trim()) || /^\s*[\w.]+:(\s*;.*)?$/.test(l.trim())).length + 1;
+  const ssaVars = new Set([...code.matchAll(/%[\w.]+(?=\s*=)/g)].map(m=>m[0])).size;
+  const cfg = br + blocks;
+  const loops = lines.filter(l => /\bphi\b/.test(l) || /br\s+label/.test(l)).length;
+  const memOps = load + store;
+
+  // Validation
+  const hasDef = /\bdefine\b/.test(code);
+  const hasRet = /\bret\b/.test(code);
+  const hasSSA = /(%[\w.]+\s*=)/.test(code);
+  const openB = (code.match(/\{/g)||[]).length;
+  const closeB = (code.match(/\}/g)||[]).length;
+  const balanced = openB === closeB && openB > 0;
+  const hasLabel = /^\s*[\w.]+:\s*$/m.test(code);
+  const hasLabelIfBr = !br || hasLabel;
+  const valScore = [hasDef,hasRet,hasSSA,balanced,hasLabelIfBr].filter(Boolean).length;
+
+  return { add,sub,mul,div,icmp,phi,br,ret,load,store,call,allInstr,blocks,ssaVars,cfg,loops,memOps,hasDef,hasRet,hasSSA,balanced,hasLabel,hasLabelIfBr,valScore };
+}
+
+function mutDist(a, b) {
+  if (!a || !b) return {added:0, removed:0};
+  const la = new Set(a.split('\n').map(l=>l.trim()).filter(Boolean));
+  const lb = new Set(b.split('\n').map(l=>l.trim()).filter(Boolean));
+  const added = [...lb].filter(l=>!la.has(l)).length;
+  const removed = [...la].filter(l=>!lb.has(l)).length;
+  return {added, removed};
+}
+
+function analyzeAll() {
+  state.original = document.getElementById('ir-original').value;
+  state.llm = document.getElementById('ir-llm').value;
+
+  if (!state.random) generateRandom();
+  if (!state.grammar) generateGrammar();
+
+  displayIR('display-original', state.original);
+  displayIR('display-llm', state.llm);
+
+  const mo = analyzeIR(state.original);
+  const ml = analyzeIR(state.llm);
+  const mr = analyzeIR(state.random);
+  const mg = analyzeIR(state.grammar);
+
+  if (!mo) { alert('Please paste an Original IR first.'); return; }
+
+  state.metrics = { original: mo, llm: ml, random: mr, grammar: mg };
+
+  const distL = mutDist(state.original, state.llm);
+  const distR = mutDist(state.original, state.random);
+  const distG = mutDist(state.original, state.grammar);
+
+  // VALIDATION CARDS
+  renderValidation(mo, ml, mr, mg);
+
+  // METRICS TABLE
+  const mbody = document.getElementById('metrics-body');
+  const best = (vals, hi=true) => {
+    const nums = vals.map(Number);
+    const target = hi ? Math.max(...nums) : Math.min(...nums.filter(n=>n>0)||[0]);
+    return nums.map(n => n === target ? 'metric-best' : '');
+  };
+
+  const rows = [
+    ['Total Instructions', mo.allInstr, ml?.allInstr??'—', mr?.allInstr??'—', mg?.allInstr??'—'],
+    ['add count', mo.add, ml?.add??'—', mr?.add??'—', mg?.add??'—'],
+    ['sub count', mo.sub, ml?.sub??'—', mr?.sub??'—', mg?.sub??'—'],
+    ['mul count', mo.mul, ml?.mul??'—', mr?.mul??'—', mg?.mul??'—'],
+    ['icmp count', mo.icmp, ml?.icmp??'—', mr?.icmp??'—', mg?.icmp??'—'],
+    ['phi count', mo.phi, ml?.phi??'—', mr?.phi??'—', mg?.phi??'—'],
+    ['br count', mo.br, ml?.br??'—', mr?.br??'—', mg?.br??'—'],
+    ['load/store', mo.memOps, ml?.memOps??'—', mr?.memOps??'—', mg?.memOps??'—'],
+    ['call count', mo.call, ml?.call??'—', mr?.call??'—', mg?.call??'—'],
+    ['Basic Blocks', mo.blocks, ml?.blocks??'—', mr?.blocks??'—', mg?.blocks??'—'],
+    ['SSA Variables', mo.ssaVars, ml?.ssaVars??'—', mr?.ssaVars??'—', mg?.ssaVars??'—'],
+    ['CFG Complexity', mo.cfg, ml?.cfg??'—', mr?.cfg??'—', mg?.cfg??'—'],
+    ['Validation Score', mo.valScore+'/5', (ml?.valScore??0)+'/5', (mr?.valScore??0)+'/5', (mg?.valScore??0)+'/5'],
+  ];
+
+  mbody.innerHTML = rows.map(([label,orig,...rest]) => {
+    const vals = rest.map(v=>v);
+    const bests = best(rest.map(v=>typeof v==='string'&&v.includes('/')?parseInt(v):Number(v)||0));
+    return `<tr>
+      <td>${label}</td>
+      <td><span class="metric-val">${orig}</span></td>
+      ${rest.map((v,i)=>`<td><span class="metric-val ${bests[i]}">${v}</span></td>`).join('')}
+    </tr>`;
+  }).join('');
+
+  // COMPARISON TABLE
+  const cbody = document.getElementById('comparison-body');
+  const crows = [
+    ['Instruction Count', ml?.allInstr??'—', mr?.allInstr??'—', mg?.allInstr??'—'],
+    ['Basic Blocks', ml?.blocks??'—', mr?.blocks??'—', mg?.blocks??'—'],
+    ['PHI Nodes', ml?.phi??'—', mr?.phi??'—', mg?.phi??'—'],
+    ['CFG Complexity', ml?.cfg??'—', mr?.cfg??'—', mg?.cfg??'—'],
+    ['SSA Variables', ml?.ssaVars??'—', mr?.ssaVars??'—', mg?.ssaVars??'—'],
+    ['Added Instructions', distL.added, distR.added, distG.added],
+    ['Removed Instructions', distL.removed, distR.removed, distG.removed],
+    ['Validation Score', (ml?.valScore??0)+'/5', (mr?.valScore??0)+'/5', (mg?.valScore??0)+'/5'],
+  ];
+  cbody.innerHTML = crows.map(([label,...vals]) => {
+    return `<tr><td>${label}</td>${vals.map(v=>`<td><span class="metric-val">${v}</span></td>`).join('')}</tr>`;
+  }).join('');
+
+  // RESEARCH EVALUATION
+  renderEvaluation(ml, mr, mg, distL, distR, distG, mo);
+
+  // FINAL TABLE
+  renderFinalTable(ml, mr, mg, distL, distR, distG, mo);
+
+  // CFG
+  renderCFG(mo, ml, mr, mg);
+
+  // CONCLUSION
+  renderConclusion(ml, mr, mg, distL, distR, distG);
+
+  // SHOW SECTIONS
+  ['analysis-section','comparison-section','eval-section','final-table-section','cfg-section','conclusion-section']
+    .forEach(id => document.getElementById(id).style.display = '');
+
+  state.analyzed = true;
+  setStatus('green', 'Analysis complete');
+  document.getElementById('analysis-section').scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+
+function renderValidation(mo, ml, mr, mg) {
+  const grid = document.getElementById('validation-grid');
+  const checks = ['Has define','Has ret','Uses SSA','Balanced braces','Labels if branches'];
+  const data = [
+    {name:'Original', color:'#82aaff', m:mo},
+    {name:'LLM', color:'#c792ea', m:ml},
+    {name:'Random', color:'#f7b94f', m:mr},
+    {name:'Grammar', color:'#3dd68c', m:mg},
+  ];
+  grid.innerHTML = data.map(({name,color,m}) => {
+    if (!m) return `<div class="val-card"><div class="val-card-title" style="color:${color}">${name}</div><div class="val-card-body"><div class="badge badge-warn">No IR</div></div></div>`;
+    const vals = [m.hasDef,m.hasRet,m.hasSSA,m.balanced,m.hasLabelIfBr];
+    const badges = checks.map((c,i) =>
+      `<div class="badge ${vals[i]?'badge-pass':'badge-fail'}" style="margin-bottom:4px">${vals[i]?'✓':'✗'} ${c}</div>`
+    ).join('');
+    return `<div class="val-card">
+      <div class="val-card-title" style="color:${color}">${name} — ${m.valScore}/5</div>
+      <div class="val-card-body">${badges}</div>
+    </div>`;
+  }).join('');
+}
+
+function pct(val, max) { return Math.min(100, Math.round((val/max)*100)); }
+
+function scoreColor(s) {
+  if (s >= 70) return 'var(--green)';
+  if (s >= 40) return 'var(--amber)';
+  return 'var(--red)';
+}
+
+function renderEvaluation(ml, mr, mg, distL, distR, distG, mo) {
+  const evalColors = ['#c792ea','#f7b94f','#3dd68c'];
+  const evalNames = ['LLM Mutation','Random Mutation','Grammar Mutation'];
+  const metrics = [ml,mr,mg];
+  const dists = [distL,distR,distG];
+
+  // Valid IR probability (heuristic)
+  const validProb = metrics.map(m => m ? Math.round((m.valScore/5)*100) : 0);
+  // Structural diversity (CFG diff from original)
+  const structDiv = metrics.map((m,i) => m ? Math.min(100, Math.round(((Math.abs((m.cfg||0)-(mo.cfg||0))+1)/(mo.cfg+1))*80 + (dists[i].added*3))) : 0);
+  // Opt interest
+  const optInt = metrics.map(m => m ? Math.min(100, Math.round((m.loops*15 + m.phi*20 + m.br*10 + m.memOps*15 + m.allInstr*2))) : 0);
+  // Novelty
+  const novelty = metrics.map((m,i) => m ? Math.min(100, Math.round((dists[i].added*10 + dists[i].removed*8 + Math.abs((m.ssaVars||0)-(mo.ssaVars||0))*5))) : 0);
+
+  const ecards = document.getElementById('eval-cards');
+  ecards.innerHTML = evalNames.map((name,i) => {
+    const m = metrics[i]; if (!m) return '';
+    const overall = Math.round((validProb[i]+structDiv[i]+optInt[i]+novelty[i])/4);
+    return `<div class="eval-card">
+      <div class="eval-card-title">Overall Score</div>
+      <div class="eval-card-name" style="color:${evalColors[i]}">${name}</div>
+      <div style="font-family:var(--mono);font-size:28px;font-weight:700;color:${scoreColor(overall)}">${overall}</div>
+      <div style="font-family:var(--mono);font-size:11px;color:var(--text3)">/ 100</div>
+    </div>`;
+  }).join('');
+
+  const ebars = document.getElementById('eval-bars');
+  const barDefs = [
+    {label:'Valid IR Probability',    vals:validProb, colors:evalColors},
+    {label:'Structural Diversity',    vals:structDiv, colors:evalColors},
+    {label:'Optimization Interest',   vals:optInt,    colors:evalColors},
+    {label:'Novelty Score',           vals:novelty,   colors:evalColors},
+  ];
+  const mutLabels = ['LLM','Rnd','Grm'];
+  ebars.innerHTML = barDefs.map(({label,vals,colors}) => `
+    <div style="margin-bottom:1.25rem">
+      <div style="font-family:var(--mono);font-size:11px;color:var(--text2);margin-bottom:.5rem">${label}</div>
+      ${vals.map((v,i) => `
+        <div class="progress-row">
+          <div class="progress-label" style="color:${colors[i]};width:130px">${evalNames[i].split(' ')[0]}</div>
+          <div class="progress-bar-wrap"><div class="progress-bar" style="width:${v}%;background:${colors[i]}"></div></div>
+          <div class="progress-val">${v}%</div>
+        </div>`).join('')}
+    </div>`).join('');
+}
+
+function renderFinalTable(ml, mr, mg, distL, distR, distG, mo) {
+  const tbody = document.getElementById('final-body');
+  const m = [ml,mr,mg];
+  const d = [distL,distR,distG];
+  const validPct = m.map(x => x ? Math.round((x.valScore/5)*100)+'%' : '—');
+  const ssaErr = m.map(x => x ? (x.hasSSA?'0':'1+') : '—');
+  const phiErr = m.map(x => {
+    if (!x) return '—';
+    // Heuristic: phi error if phi>0 but blocks<=1
+    return (x.phi > 0 && x.blocks <= 1) ? '1' : '0';
+  });
+  const useful = m.map((x,i) => x ? (d[i].added > 0 || d[i].removed > 0 ? 'Yes' : 'No') : '—');
+  const uniqueCFG = m.map((x,i) => {
+    if (!x) return '—';
+    return (x.cfg !== mo.cfg || x.blocks !== mo.blocks) ? 'Yes' : 'No';
+  });
+
+  const rows = [
+    ['Valid IR %', ...validPct],
+    ['SSA Errors (est.)', ...ssaErr],
+    ['PHI Errors (est.)', ...phiErr],
+    ['Useful Mutations', ...useful],
+    ['Unique CFGs', ...uniqueCFG],
+    ['Instruction Delta', ...d.map(x=>`+${x.added}/-${x.removed}`)],
+    ['CFG Complexity', ...m.map(x=>x?x.cfg:'—')],
+  ];
+
+  tbody.innerHTML = rows.map(([lbl,...vals]) =>
+    `<tr><td>${lbl}</td>${vals.map(v=>`<td><span class="metric-val">${v}</span></td>`).join('')}</tr>`
+  ).join('');
+}
+
+function renderCFG(mo, ml, mr, mg) {
+  const cfgGrid = document.getElementById('cfg-grid');
+  const defs = [
+    {name:'Original',  color:'#82aaff', m:mo},
+    {name:'LLM',       color:'#c792ea', m:ml},
+    {name:'Random',    color:'#f7b94f', m:mr},
+    {name:'Grammar',   color:'#3dd68c', m:mg},
+  ];
+
+  cfgGrid.innerHTML = defs.map(({name,color,m}) => {
+    if (!m) return `<div class="cfg-card"><div class="cfg-card-title" style="color:${color}">${name} CFG</div><div class="empty-ir">No data</div></div>`;
+
+    const blocks = Math.max(1, m.blocks);
+    const hasBranch = m.br > 0;
+    const hasLoop = m.loops > 1;
+    const hasPhi = m.phi > 0;
+
+    // Build a simple CFG
+    let diagram = `<div class="cfg-diagram">`;
+    diagram += `<div class="cfg-node cfg-entry">entry</div>`;
+    diagram += `<div class="cfg-arrow">↓</div>`;
+
+    if (hasBranch && blocks > 2) {
+      // Show branch split
+      diagram += `<div class="cfg-node cfg-branch" style="border-color:${color};color:${color}">cond.br</div>`;
+      diagram += `<div class="cfg-arrow">↙&nbsp;&nbsp;↘</div>`;
+      diagram += `<div style="display:flex;gap:12px;justify-content:center">`;
+      diagram += `<div class="cfg-node cfg-block">bb.true</div>`;
+      diagram += `<div class="cfg-node cfg-block">bb.false</div>`;
+      diagram += `</div>`;
+      diagram += `<div class="cfg-arrow">↘&nbsp;&nbsp;↙</div>`;
+    } else if (blocks > 1) {
+      for (let i=1; i<Math.min(blocks,4); i++) {
+        diagram += `<div class="cfg-node cfg-block">block.${i}</div>`;
+        if (i < Math.min(blocks,4)-1) diagram += `<div class="cfg-arrow">↓</div>`;
+      }
+      diagram += `<div class="cfg-arrow">↓</div>`;
+    }
+
+    if (hasPhi) {
+      diagram += `<div class="cfg-node cfg-branch" style="font-size:10px">φ merge</div>`;
+      diagram += `<div class="cfg-arrow">↓</div>`;
+    }
+    if (hasLoop) {
+      diagram += `<div class="cfg-node cfg-block" style="border-style:dashed">loop.back</div>`;
+      diagram += `<div class="cfg-arrow">↓</div>`;
+    }
+
+    diagram += `<div class="cfg-node cfg-exit">exit / ret</div>`;
+    diagram += `</div>`;
+
+    const stats = [
+      `<span style="color:${color}">${m.blocks}</span> blocks`,
+      `<span style="color:${color}">${m.br}</span> branches`,
+      `<span style="color:${color}">${m.phi}</span> phis`,
+    ].join(' · ');
+
+    return `<div class="cfg-card">
+      <div class="cfg-card-title" style="color:${color}">${name} CFG</div>
+      ${diagram}
+      <div style="text-align:center;font-family:var(--mono);font-size:10px;color:var(--text3);margin-top:.75rem">${stats}</div>
+    </div>`;
+  }).join('');
+}
+
+function renderConclusion(ml, mr, mg, distL, distR, distG) {
+  const texts = [];
+  if (ml && mr && mg) {
+    // CFG complexity comparison
+    const cfgs = {llm:ml.cfg, rand:mr.cfg, gram:mg.cfg};
+    const maxCFG = Object.entries(cfgs).sort((a,b)=>b[1]-a[1])[0];
+    const nameMap = {llm:'LLM',rand:'Random',gram:'Grammar'};
+    texts.push(`<strong>${nameMap[maxCFG[0]]} mutation</strong> produces the highest CFG complexity score (${maxCFG[1]}), suggesting richer control flow structure.`);
+
+    // Validity
+    const bestVal = [['LLM',ml.valScore],['Random',mr.valScore],['Grammar',mg.valScore]].sort((a,b)=>b[1]-a[1])[0];
+    texts.push(`<strong>${bestVal[0]} mutation</strong> achieves the highest validation score (${bestVal[1]}/5), indicating stronger adherence to LLVM IR structural rules.`);
+
+    // Novelty
+    const novs = [['LLM',distL],['Random',distR],['Grammar',distG]];
+    const mostNovel = novs.sort((a,b)=>(b[1].added+b[1].removed)-(a[1].added+a[1].removed))[0];
+    texts.push(`<strong>${mostNovel[0]} mutation</strong> introduces the most structural novelty, with ${mostNovel[1].added} added and ${mostNovel[1].removed} removed instruction lines relative to the original.`);
+
+    // PHI / SSA richness
+    const maxPhi = [['LLM',ml.phi],['Random',mr.phi],['Grammar',mg.phi]].sort((a,b)=>b[1]-a[1])[0];
+    if (maxPhi[1] > 0) texts.push(`<strong>${maxPhi[0]} mutation</strong> introduces the most PHI nodes (${maxPhi[1]}), enabling richer data-flow analysis opportunities.`);
+    else texts.push(`No mutation introduces PHI nodes — consider testing with loop-containing IR to evaluate data-flow diversity.`);
+
+    // Summary
+    texts.push(`<em>Overall:</em> LLM-based mutation tends to produce semantically meaningful transformations, while random mutation excels at uncovering shallow syntactic variants. Grammar-based mutation best preserves structural validity, making it most suitable for correctness-focused fuzzing campaigns.`);
+  } else {
+    texts.push('Run <strong>Analyze All Mutations</strong> to generate the research conclusion.');
+  }
+
+  document.getElementById('conclusion-text').innerHTML = texts.map(t=>`<p style="margin-bottom:.75rem">${t}</p>`).join('');
+}
+
+// ─── PANEL TOGGLE ─────────────────────────────────────────────────────────────
+function togglePanel(header) {
+  const panel = header.closest('.panel');
+  panel.classList.toggle('collapsed');
+}
+
+// ─── RESET ────────────────────────────────────────────────────────────────────
+function resetAll() {
+  document.getElementById('ir-original').value = '';
+  document.getElementById('ir-llm').value = '';
+  ['original','llm','random','grammar'].forEach(k => {
+    state[k] = '';
+    const el = document.getElementById(`display-${k}`);
+    const msgs = {original:'Paste original IR above',llm:'Paste LLM mutation above',random:'Click "Generate Random Mutation"',grammar:'Click "Generate Grammar Mutation"'};
+    el.innerHTML = `<div class="empty-ir">${msgs[k]}</div>`;
+  });
+  ['analysis-section','comparison-section','eval-section','final-table-section','cfg-section','conclusion-section']
+    .forEach(id => document.getElementById(id).style.display = 'none');
+  state.analyzed = false;
+  setStatus('gray', 'Reset — paste IR and generate mutations');
+}
+
+// ─── STATUS ───────────────────────────────────────────────────────────────────
+function setStatus(color, msg) {
+  const dot = document.getElementById('status-dot');
+  const txt = document.getElementById('status-text');
+  const colorMap = {green:'var(--green)',gray:'var(--text3)',amber:'var(--amber)',red:'var(--red)'};
+  dot.style.background = colorMap[color]||'var(--text3)';
+  dot.style.boxShadow = color==='green'?`0 0 6px var(--green)`:color==='amber'?'0 0 6px var(--amber)':'none';
+  txt.textContent = msg;
+}
+
+// ─── LOAD DEMO ────────────────────────────────────────────────────────────────
+function loadDemo() {
+  const orig = `; Fibonacci-style function
+define i32 @fib(i32 %n) {
+entry:
+  %cmp = icmp slt i32 %n, 2
+  br i1 %cmp, label %base, label %recurse
+
+base:
+  ret i32 %n
+
+recurse:
+  %n1 = sub i32 %n, 1
+  %n2 = sub i32 %n, 2
+  %r1 = call i32 @fib(i32 %n1)
+  %r2 = call i32 @fib(i32 %n2)
+  %sum = add i32 %r1, %r2
+  ret i32 %sum
+}`;
+  const llmMut = `; LLM mutation: changed add to mul, sub to xor
+define i32 @fib(i32 %n) {
+entry:
+  %cmp = icmp slt i32 %n, 2
+  br i1 %cmp, label %base, label %recurse
+
+base:
+  ret i32 %n
+
+recurse:
+  %n1 = xor i32 %n, 1
+  %n2 = sub i32 %n, 2
+  %r1 = call i32 @fib(i32 %n1)
+  %r2 = call i32 @fib(i32 %n2)
+  %sum = mul i32 %r1, %r2
+  ; LLM added extra comparison for loop analysis
+  %check = icmp ne i32 %sum, 0
+  ret i32 %sum
+}`;
+  document.getElementById('ir-original').value = orig;
+  document.getElementById('ir-llm').value = llmMut;
+  state.original = orig; state.llm = llmMut; state.random = ''; state.grammar = '';
+  displayIR('display-original', orig);
+  displayIR('display-llm', llmMut);
+  setStatus('amber', 'Demo loaded — click Analyze All Mutations');
+}
+
+// Add a demo button
+document.querySelector('.btn-row').insertAdjacentHTML('beforeend',
+  `<button class="btn btn-ghost" onclick="loadDemo()">🎬 Load Demo</button>`);
+</script>
+</body>
+</html>

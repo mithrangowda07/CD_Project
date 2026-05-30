@@ -50,6 +50,11 @@ def research():
     return render_template("research.html")
 
 
+@app.route("/mutation")
+def mutation():
+    return render_template("mutation.html")
+
+
 @app.route("/api/generate-ir", methods=["POST"])
 def api_generate_ir():
     if "c_file" not in request.files:
