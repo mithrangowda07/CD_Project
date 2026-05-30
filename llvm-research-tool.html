@@ -1,0 +1,844 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>LLVM Compiler Fuzzing & IR Constraints Reference</title>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg:#0d0f14;
+  --bg2:#13161e;
+  --bg3:#1a1e28;
+  --bg4:#20253300;
+  --border:#2a2f3e;
+  --border2:#343b52;
+  --text:#e2e6f0;
+  --text2:#9aa3b8;
+  --text3:#5c6480;
+  --accent:#4f9cf9;
+  --accent2:#7b5ea7;
+  --green:#4ade80;
+  --red:#f87171;
+  --amber:#fbbf24;
+  --teal:#2dd4bf;
+  --mono:'IBM Plex Mono',monospace;
+  --sans:'IBM Plex Sans',sans-serif;
+}
+body{background:var(--bg);color:var(--text);font-family:var(--sans);font-size:15px;line-height:1.65;min-height:100vh}
+a{color:var(--accent);text-decoration:none}
+
+/* SCROLLBAR */
+::-webkit-scrollbar{width:6px;height:6px}
+::-webkit-scrollbar-track{background:var(--bg)}
+::-webkit-scrollbar-thumb{background:var(--border2);border-radius:3px}
+
+/* HEADER */
+header{border-bottom:1px solid var(--border);padding:1.5rem 2rem;background:var(--bg2);position:sticky;top:0;z-index:100;display:flex;align-items:center;gap:1rem}
+.logo{font-family:var(--mono);font-size:13px;color:var(--accent);background:#0a1929;border:1px solid #1e3a5f;padding:4px 10px;border-radius:4px;white-space:nowrap}
+header h1{font-size:15px;font-weight:500;color:var(--text);flex:1}
+.badge{font-family:var(--mono);font-size:11px;background:var(--bg3);border:1px solid var(--border);color:var(--text2);padding:3px 8px;border-radius:3px}
+
+/* NAV */
+nav{background:var(--bg2);border-bottom:1px solid var(--border);padding:0 2rem;display:flex;gap:0;overflow-x:auto}
+nav a{display:inline-block;padding:10px 16px;font-size:13px;font-family:var(--mono);color:var(--text2);border-bottom:2px solid transparent;transition:all .15s;white-space:nowrap}
+nav a:hover{color:var(--text);background:var(--bg3)}
+nav a.active{color:var(--accent);border-bottom-color:var(--accent)}
+
+/* LAYOUT */
+main{max-width:1200px;margin:0 auto;padding:2rem}
+.section{display:none;animation:fadeIn .2s ease}
+.section.active{display:block}
+@keyframes fadeIn{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:translateY(0)}}
+
+/* SECTION HEADER */
+.section-header{margin-bottom:2rem}
+.section-header h2{font-size:22px;font-weight:500;color:var(--text);margin-bottom:.4rem}
+.section-header p{color:var(--text2);font-size:14px}
+.tag{display:inline-block;font-family:var(--mono);font-size:11px;padding:2px 8px;border-radius:3px;margin-right:4px;margin-top:4px}
+.tag-blue{background:#0a1929;color:#60a5fa;border:1px solid #1e3a5f}
+.tag-purple{background:#1a0f2e;color:#c084fc;border:1px solid #3d1f6e}
+.tag-green{background:#052011;color:#4ade80;border:1px solid #144d2a}
+.tag-red{background:#200a0a;color:#f87171;border:1px solid #4d1414}
+.tag-amber{background:#1f1400;color:#fbbf24;border:1px solid #4d3300}
+.tag-teal{background:#031a18;color:#2dd4bf;border:1px solid #0e4a43}
+
+/* SURVEY CARDS */
+.cards-grid{display:grid;gap:1px;background:var(--border)}
+.card{background:var(--bg2);overflow:hidden}
+.card-header{padding:1.25rem 1.5rem;cursor:pointer;display:flex;align-items:center;gap:12px;transition:background .1s}
+.card-header:hover{background:var(--bg3)}
+.card-icon{width:36px;height:36px;border-radius:6px;display:flex;align-items:center;justify-content:center;font-family:var(--mono);font-size:12px;font-weight:500;flex-shrink:0}
+.card-header-text{flex:1}
+.card-header-text h3{font-size:15px;font-weight:500;color:var(--text);margin-bottom:2px}
+.card-header-text p{font-size:12px;color:var(--text3);font-family:var(--mono)}
+.chevron{color:var(--text3);transition:transform .2s;font-size:16px}
+.card.open .chevron{transform:rotate(180deg)}
+.card-body{display:none;border-top:1px solid var(--border)}
+.card.open .card-body{display:block}
+
+.card-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:0;border-bottom:none}
+.card-section{padding:1.25rem 1.5rem;border-right:1px solid var(--border);border-bottom:1px solid var(--border)}
+.card-section:last-child{border-right:none}
+.card-section h4{font-family:var(--mono);font-size:11px;font-weight:500;text-transform:uppercase;letter-spacing:.08em;margin-bottom:.75rem}
+.card-section ul{list-style:none;padding:0}
+.card-section ul li{font-size:13px;color:var(--text2);padding:3px 0 3px 14px;position:relative;line-height:1.5}
+.card-section ul li::before{content:'—';position:absolute;left:0;color:var(--text3);font-size:11px}
+.card-section p{font-size:13px;color:var(--text2);line-height:1.6}
+
+/* PURPOSE BANNER */
+.purpose-banner{padding:1rem 1.5rem;background:var(--bg3);border-bottom:1px solid var(--border)}
+.purpose-banner p{font-size:13px;color:var(--text2);}
+.purpose-banner strong{color:var(--text);font-weight:500}
+
+/* TABLE */
+.table-controls{display:flex;gap:12px;margin-bottom:1.5rem;align-items:center;flex-wrap:wrap}
+.search-box{flex:1;min-width:200px;position:relative}
+.search-box input{width:100%;background:var(--bg2);border:1px solid var(--border);color:var(--text);font-family:var(--mono);font-size:13px;padding:8px 12px 8px 36px;border-radius:4px;outline:none;transition:border .15s}
+.search-box input:focus{border-color:var(--accent)}
+.search-icon{position:absolute;left:11px;top:50%;transform:translateY(-50%);color:var(--text3);font-size:14px;pointer-events:none}
+select{background:var(--bg2);border:1px solid var(--border);color:var(--text);font-family:var(--mono);font-size:13px;padding:8px 12px;border-radius:4px;outline:none;cursor:pointer}
+select:focus{border-color:var(--accent)}
+
+.constraint-table{width:100%;border-collapse:collapse;font-size:13px}
+.constraint-table thead th{background:var(--bg3);color:var(--text2);font-family:var(--mono);font-size:11px;font-weight:500;text-transform:uppercase;letter-spacing:.06em;padding:10px 14px;text-align:left;border-bottom:1px solid var(--border);white-space:nowrap}
+.constraint-table tbody tr{border-bottom:1px solid var(--border);cursor:pointer;transition:background .1s}
+.constraint-table tbody tr:hover{background:var(--bg3)}
+.constraint-table tbody tr.expanded{background:var(--bg3)}
+.constraint-table td{padding:12px 14px;vertical-align:middle}
+.constraint-table td:first-child{font-family:var(--mono);font-weight:500;color:var(--text);white-space:nowrap}
+.constraint-table td:nth-child(2){color:var(--text2);max-width:340px}
+.expand-row td{padding:0;background:var(--bg2)}
+.expand-row td > div{padding:1.25rem 1.5rem;border-bottom:2px solid var(--accent)}
+.row-hidden{display:none}
+.two-col{display:grid;grid-template-columns:1fr 1fr;gap:1px;background:var(--border);margin-top:1rem;border-radius:4px;overflow:hidden}
+.code-block{background:var(--bg);padding:1rem 1.25rem}
+.code-block h5{font-family:var(--mono);font-size:11px;font-weight:500;margin-bottom:.6rem}
+.code-block.valid h5{color:var(--green)}
+.code-block.invalid h5{color:var(--red)}
+pre{font-family:var(--mono);font-size:12px;line-height:1.7;overflow-x:auto;white-space:pre}
+.why-matters{margin-top:1rem;padding:.75rem 1rem;background:var(--bg3);border-left:3px solid var(--accent2);border-radius:0 4px 4px 0}
+.why-matters p{font-size:13px;color:var(--text2)}
+.why-matters strong{display:block;font-size:11px;font-family:var(--mono);color:var(--accent2);margin-bottom:.25rem;text-transform:uppercase;letter-spacing:.06em}
+
+/* SYNTAX HIGHLIGHT */
+.kw{color:#c084fc}
+.ty{color:#60a5fa}
+.fn{color:#fbbf24}
+.num{color:#4ade80}
+.cm{color:#4b5563;font-style:italic}
+.lb{color:#2dd4bf}
+.op{color:#f87171}
+.str{color:#fb923c}
+
+/* EXPLORER */
+.explorer-layout{display:grid;grid-template-columns:280px 1fr;gap:1px;background:var(--border);min-height:600px}
+.explorer-sidebar{background:var(--bg2);padding:1.25rem}
+.explorer-sidebar h3{font-family:var(--mono);font-size:11px;text-transform:uppercase;letter-spacing:.08em;color:var(--text3);margin-bottom:1rem}
+.constraint-list{display:flex;flex-direction:column;gap:1px}
+.constraint-btn{background:transparent;border:none;color:var(--text2);font-family:var(--mono);font-size:13px;padding:8px 12px;text-align:left;cursor:pointer;border-radius:4px;transition:all .1s;display:flex;align-items:center;gap:8px}
+.constraint-btn:hover{background:var(--bg3);color:var(--text)}
+.constraint-btn.active{background:#0a1929;color:var(--accent);border:1px solid #1e3a5f}
+.constraint-btn .dot{width:6px;height:6px;border-radius:50%;background:var(--border2);flex-shrink:0}
+.constraint-btn.active .dot{background:var(--accent)}
+
+.explorer-content{background:var(--bg2);padding:1.5rem}
+.explorer-empty{display:flex;flex-direction:column;align-items:center;justify-content:center;height:100%;color:var(--text3);gap:.75rem}
+.explorer-empty svg{opacity:.3}
+.explorer-detail h2{font-size:18px;font-weight:500;color:var(--text);margin-bottom:.5rem}
+.explorer-detail .meta{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:1.5rem}
+.detail-section{margin-bottom:1.5rem}
+.detail-section h4{font-family:var(--mono);font-size:11px;text-transform:uppercase;letter-spacing:.08em;color:var(--text3);margin-bottom:.6rem;padding-bottom:.4rem;border-bottom:1px solid var(--border)}
+.detail-section p{font-size:14px;color:var(--text2);line-height:1.6}
+.verifier-errors{display:flex;flex-direction:column;gap:6px}
+.verifier-error{font-family:var(--mono);font-size:12px;color:var(--red);background:#200a0a;border:1px solid #4d1414;padding:8px 12px;border-radius:4px}
+.examples-grid{display:grid;grid-template-columns:1fr 1fr;gap:1px;background:var(--border);border-radius:4px;overflow:hidden}
+
+/* STATS */
+.stats-bar{display:grid;grid-template-columns:repeat(4,1fr);gap:1px;background:var(--border);margin-bottom:2rem;border-radius:6px;overflow:hidden}
+.stat{background:var(--bg2);padding:1rem 1.25rem}
+.stat .num{font-family:var(--mono);font-size:22px;font-weight:500;color:var(--text)}
+.stat .lbl{font-size:12px;color:var(--text3);margin-top:2px}
+
+/* RESPONSIVE */
+@media(max-width:768px){
+  header{padding:1rem}
+  main{padding:1rem}
+  nav{padding:0 1rem}
+  .explorer-layout{grid-template-columns:1fr}
+  .two-col,.examples-grid{grid-template-columns:1fr}
+  .stats-bar{grid-template-columns:repeat(2,1fr)}
+  .card-grid{grid-template-columns:1fr}
+}
+
+/* EMPTY STATE */
+.no-results{text-align:center;padding:3rem;color:var(--text3);font-family:var(--mono);font-size:13px}
+
+/* Scrollable table wrapper */
+.table-wrap{overflow-x:auto;border:1px solid var(--border);border-radius:6px}
+</style>
+</head>
+<body>
+
+<header>
+  <div class="logo">llvm-research</div>
+  <h1>Compiler Fuzzing &amp; IR Constraints Reference</h1>
+  <span class="badge">v1.0</span>
+</header>
+
+<nav id="main-nav">
+  <a href="#" class="active" data-section="survey">§1 Testing Survey</a>
+  <a href="#" data-section="catalog">§2 IR Constraints Catalog</a>
+  <a href="#" data-section="explorer">§3 Constraint Explorer</a>
+</nav>
+
+<main>
+
+<!-- SECTION 1: Survey -->
+<section id="survey" class="section active">
+  <div class="section-header">
+    <h2>Compiler Testing Survey</h2>
+  </div>
+
+  
+  <div class="cards-grid" id="survey-cards">
+
+    <!-- CSMITH -->
+    <div class="card open" data-card="csmith">
+      <div class="card-header" onclick="toggleCard(this)">
+        <div class="card-icon" style="background:#0a1929;border:1px solid #1e3a5f;color:#60a5fa">CS</div>
+        <div class="card-header-text">
+          <h3>Csmith</h3>
+          <p>random-c-program-generator · 2011 · Yang et al.</p>
+        </div>
+        <span class="chevron">▾</span>
+      </div>
+      <div class="card-body">
+        <div class="purpose-banner">
+          <p><strong>Purpose:</strong> Generate random, valid C programs to stress-test C compilers and expose miscompilation bugs via differential testing.</p>
+        </div>
+        <div class="card-grid">
+          <div class="card-section">
+            <h4 style="color:#60a5fa">How it works</h4>
+            <ul>
+              <li>Generates syntactically and semantically valid C programs from scratch using grammar-guided random production rules</li>
+              <li>Avoids undefined behaviour (UB) through careful pointer aliasing analysis and safe expression generation</li>
+              <li>Compiles each generated program with multiple compilers (GCC, Clang, ICC) at varying opt levels</li>
+              <li>Flags discrepancies in output as potential bugs — programs should produce identical results</li>
+              <li>Incorporates a runtime checker to catch crashes and sanitizer failures</li>
+            </ul>
+          </div>
+          <div class="card-section">
+            <h4 style="color:#4ade80">Advantages</h4>
+            <ul>
+              <li>Produces standards-compliant C — maximises compiler portability testing</li>
+              <li>Has found hundreds of real bugs in GCC, Clang, and other production compilers</li>
+              <li>No seed corpus required — fully autonomous generation</li>
+              <li>Precise UB-avoidance lets results be interpreted unambiguously</li>
+              <li>Well-studied baseline; large body of follow-on work</li>
+            </ul>
+          </div>
+          <div class="card-section">
+            <h4 style="color:#f87171">Limitations</h4>
+            <ul>
+              <li>C-specific — cannot directly test LLVM IR passes or backend pipelines</li>
+              <li>Generated programs are structurally shallow; rarely stress advanced language features</li>
+              <li>UB-avoidance heuristics are conservative — large classes of legal programs are never explored</li>
+              <li>No feedback signal — mutation is blind, low efficiency vs coverage-guided tools</li>
+              <li>Slow: most generated programs are boring to the compiler's optimiser</li>
+            </ul>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- YARPGen -->
+    <div class="card" data-card="yarpgen">
+      <div class="card-header" onclick="toggleCard(this)">
+        <div class="card-icon" style="background:#1a0f2e;border:1px solid #3d1f6e;color:#c084fc">YG</div>
+        <div class="card-header-text">
+          <h3>YARPGen</h3>
+          <p>yet-another-random-program-generator · 2020 · Livinskii et al.</p>
+        </div>
+        <span class="chevron">▾</span>
+      </div>
+      <div class="card-body">
+        <div class="purpose-banner">
+          <p><strong>Purpose:</strong> Generate C/C++ programs that specifically target and exercise compiler optimisation passes, improving on Csmith's ability to trigger optimiser bugs.</p>
+        </div>
+        <div class="card-grid">
+          <div class="card-section">
+            <h4 style="color:#c084fc">How it works</h4>
+            <ul>
+              <li>Uses a generate-and-filter approach: builds expression trees that are statically proven to be UB-free at generation time</li>
+              <li>Employs <em>generation policies</em> that bias toward patterns known to exercise specific optimisations (loop vectorisation, SLP, LICM, etc.)</li>
+              <li>Tracks live ranges and aliasing symbolically to prove safety without runtime checks</li>
+              <li>Outputs C/C++ source that is then compiled and differentially tested</li>
+              <li>Supports generating code that triggers specific LLVM opt passes explicitly</li>
+            </ul>
+          </div>
+          <div class="card-section">
+            <h4 style="color:#4ade80">Advantages</h4>
+            <ul>
+              <li>Substantially better at triggering LLVM's middle-end optimiser bugs than Csmith</li>
+              <li>Symbolic UB-avoidance is faster and more complete than Csmith's runtime approach</li>
+              <li>Extensible policy system — new optimisation targets can be added</li>
+              <li>Found hundreds of new bugs not found by Csmith in LLVM/GCC</li>
+              <li>Supports C++ in addition to C, covering more of the compiler pipeline</li>
+            </ul>
+          </div>
+          <div class="card-section">
+            <h4 style="color:#f87171">Limitations</h4>
+            <ul>
+              <li>Still operates at C/C++ source level — IR passes are only indirectly tested</li>
+              <li>Policy design requires expert knowledge of which optimisations to target</li>
+              <li>No coverage feedback — generation remains structurally blind</li>
+              <li>Generated programs can be unrealistic / not representative of real-world code</li>
+              <li>Limited to arithmetic and loop-heavy code; poor coverage of memory-safety passes</li>
+            </ul>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Coverage-Guided Fuzzing -->
+    <div class="card" data-card="cgf">
+      <div class="card-header" onclick="toggleCard(this)">
+        <div class="card-icon" style="background:#031a18;border:1px solid #0e4a43;color:#2dd4bf">CGF</div>
+        <div class="card-header-text">
+          <h3>Coverage-Guided Fuzzing</h3>
+          <p>mutation-based · AFL / libFuzzer / honggfuzz paradigm</p>
+        </div>
+        <span class="chevron">▾</span>
+      </div>
+      <div class="card-body">
+        <div class="purpose-banner">
+          <p><strong>Purpose:</strong> Automatically mutate inputs (LLVM IR, bitcode, or C source) guided by code coverage feedback to maximise path exploration in the compiler under test.</p>
+        </div>
+        <div class="card-grid">
+          <div class="card-section">
+            <h4 style="color:#2dd4bf">Workflow</h4>
+            <ul>
+              <li><strong>Seed corpus:</strong> start with a set of known-good IR/bitcode files</li>
+              <li><strong>Instrument target:</strong> compile the LLVM tool (e.g. <code>opt</code>, <code>llc</code>) with edge-coverage SanitizerCoverage</li>
+              <li><strong>Mutate:</strong> apply byte-level mutations (bit flips, splices, insertions) to seeds</li>
+              <li><strong>Execute:</strong> run mutated input through compiler, record edge coverage bitmap</li>
+              <li><strong>Retain novelty:</strong> if new edges are discovered, add input to corpus</li>
+              <li><strong>Report:</strong> crashes, hangs, and assertion failures are saved as bugs</li>
+            </ul>
+          </div>
+          <div class="card-section">
+            <h4 style="color:#4ade80">Advantages</h4>
+            <ul>
+              <li>Works directly on LLVM IR bitcode — tests passes and backends that C-level tools miss</li>
+              <li>Coverage feedback makes exploration exponentially more efficient than blind mutation</li>
+              <li>Fully automated with minimal setup — pick a fuzzer and a corpus</li>
+              <li>libFuzzer natively integrated into LLVM's own testing infrastructure</li>
+              <li>Scales well: can run in parallel across many cores</li>
+              <li>Found critical bugs in clang's parser, LLVM backends, and sanitizer runtimes</li>
+            </ul>
+          </div>
+          <div class="card-section">
+            <h4 style="color:#f87171">Limitations</h4>
+            <ul>
+              <li>Byte-level mutations frequently produce <em>syntactically invalid</em> IR — rejected before reaching interesting passes</li>
+              <li>Hard to reach deep semantic bugs that require structurally valid inputs</li>
+              <li>Coverage saturation: after initial exploration, new interesting inputs become rare</li>
+              <li>Requires an instrumented build of the compiler — impractical for proprietary backends</li>
+              <li>Crash triage is manual and time-consuming; many bugs are duplicates</li>
+            </ul>
+          </div>
+        </div>
+      </div>
+    </div>
+
+
+  </div><!-- /cards-grid -->
+</section>
+
+<!-- SECTION 2: Catalog -->
+<section id="catalog" class="section">
+  <div class="section-header">
+    <h2>LLVM IR Validity Constraints Catalog</h2>
+    <p>Constraints that every well-formed LLVM IR module must satisfy. Click any row to expand the full detail.</p>
+  </div>
+
+  <div class="table-controls">
+    <div class="search-box">
+      <span class="search-icon">⌕</span>
+      <input type="text" id="search-input" placeholder="Search constraints..." oninput="filterTable()">
+    </div>
+    <select id="category-filter" onchange="filterTable()">
+      <option value="">All categories</option>
+      <option value="ssa">SSA / Value Definitions</option>
+      <option value="types">Types</option>
+      <option value="cfg">Control Flow</option>
+      <option value="memory">Memory</option>
+      <option value="functions">Functions</option>
+    </select>
+  </div>
+
+  <div class="table-wrap">
+  <table class="constraint-table" id="constraint-table">
+    <thead>
+      <tr>
+        <th>Constraint</th>
+        <th>Description</th>
+        <th>Category</th>
+        <th></th>
+      </tr>
+    </thead>
+    <tbody id="table-body">
+    </tbody>
+  </table>
+  </div>
+  <div id="no-results" class="no-results" style="display:none">No constraints match your search.</div>
+</section>
+
+<!-- SECTION 3: Explorer -->
+<section id="explorer" class="section">
+  <div class="section-header">
+    <h2>Constraint Explorer</h2>
+    <p>Select a constraint from the sidebar to view a deep-dive: explanation, examples, and common verifier errors.</p>
+  </div>
+
+  <div class="explorer-layout">
+    <div class="explorer-sidebar">
+      <h3>Constraints</h3>
+      <div class="constraint-list" id="explorer-list"></div>
+    </div>
+    <div class="explorer-content" id="explorer-content">
+      <div class="explorer-empty">
+        <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+          <rect x="3" y="3" width="18" height="18" rx="2"/><path d="M9 9h6M9 12h6M9 15h4"/>
+        </svg>
+        <p style="font-family:var(--mono);font-size:13px">Select a constraint to explore</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+</main>
+
+<script>
+const CONSTRAINTS = [
+  {
+    id: 'ssa',
+    name: 'SSA Form',
+    category: 'ssa',
+    categoryLabel: 'SSA / Value Definitions',
+    short: 'Every value defined exactly once; used after definition.',
+    description: 'LLVM IR is in Static Single Assignment (SSA) form, meaning every virtual register (%) is assigned exactly once across all paths. Instructions may only use values that dominate their use — the defining instruction must appear in a block that dominates (precedes on all paths) the block containing the use.',
+    valid: `<span class="kw">define</span> <span class="ty">i32</span> <span class="fn">@add</span>(<span class="ty">i32</span> <span class="lb">%a</span>, <span class="ty">i32</span> <span class="lb">%b</span>) {
+<span class="lb">entry:</span>
+  <span class="lb">%sum</span> = <span class="kw">add</span> <span class="ty">i32</span> <span class="lb">%a</span>, <span class="lb">%b</span>   <span class="cm">; defined once</span>
+  <span class="kw">ret</span> <span class="ty">i32</span> <span class="lb">%sum</span>              <span class="cm">; used after def</span>
+}`,
+    invalid: `<span class="kw">define</span> <span class="ty">i32</span> <span class="fn">@bad</span>(<span class="ty">i32</span> <span class="lb">%a</span>) {
+<span class="lb">entry:</span>
+  <span class="lb">%x</span> = <span class="kw">add</span> <span class="ty">i32</span> <span class="lb">%a</span>, <span class="num">1</span>
+  <span class="lb">%x</span> = <span class="kw">add</span> <span class="ty">i32</span> <span class="lb">%a</span>, <span class="num">2</span>  <span class="op">; ERROR: %x redefined</span>
+  <span class="kw">ret</span> <span class="ty">i32</span> <span class="lb">%x</span>
+}`,
+    verifierErrors: [
+      'Instruction does not dominate all uses',
+      'Value: multiple definition',
+      'Value defined in unreachable block has users'
+    ],
+    whyMatters: 'SSA form is the foundation of most LLVM optimisation passes (GVN, LICM, DCE). Without it, passes produce incorrect results or assertion-fail during construction of the def-use chain.'
+  },
+  {
+    id: 'types',
+    name: 'Type Correctness',
+    category: 'types',
+    categoryLabel: 'Types',
+    short: 'Operand types must match the instruction signature exactly.',
+    description: 'Every LLVM instruction specifies the types of its operands precisely. Type mismatches — passing an i32 where an i64 is expected, or a pointer where a float is required — are verifier errors. Types must be complete (no opaque types in most contexts) and consistent across all uses of a value.',
+    valid: `<span class="lb">%result</span> = <span class="kw">add</span> <span class="ty">i32</span> <span class="lb">%a</span>, <span class="lb">%b</span>
+<span class="lb">%fres</span>   = <span class="kw">fadd</span> <span class="ty">float</span> <span class="lb">%x</span>, <span class="lb">%y</span>
+<span class="lb">%cast</span>   = <span class="kw">sext</span> <span class="ty">i32</span> <span class="lb">%result</span> <span class="kw">to</span> <span class="ty">i64</span>`,
+    invalid: `<span class="cm">; Mixing integer and float without cast:</span>
+<span class="lb">%bad</span> = <span class="kw">add</span> <span class="ty">i32</span> <span class="lb">%a</span>, <span class="lb">%y</span>  <span class="op">; %y is float — mismatch</span>
+
+<span class="cm">; Wrong cast direction:</span>
+<span class="lb">%x</span> = <span class="kw">trunc</span> <span class="ty">i32</span> <span class="lb">%v</span> <span class="kw">to</span> <span class="ty">i64</span>  <span class="op">; trunc must narrow, not widen</span>`,
+    verifierErrors: [
+      'Both operands to a binary operator must be of the same type',
+      'Illegal operand type for instruction',
+      'trunc instruction must truncate type'
+    ],
+    whyMatters: 'Type safety is the primary correctness guarantee that lets LLVM optimisers reason about values. A type error invalidates the IR\'s semantics and will cause miscompilation if verification is skipped.'
+  },
+  {
+    id: 'dominance',
+    name: 'Dominance Rules',
+    category: 'ssa',
+    categoryLabel: 'SSA / Value Definitions',
+    short: 'A value definition must dominate all of its uses.',
+    description: 'Block A dominates block B if every path from the function entry to B passes through A. In LLVM IR, an instruction\'s result can only be used in a block that is dominated by the block containing the definition. This is a direct consequence of SSA form and is verified by the dominator tree analysis.',
+    valid: `<span class="kw">define</span> <span class="ty">i32</span> <span class="fn">@max</span>(<span class="ty">i32</span> <span class="lb">%a</span>, <span class="ty">i32</span> <span class="lb">%b</span>) {
+<span class="lb">entry:</span>
+  <span class="lb">%cmp</span> = <span class="kw">icmp</span> sgt <span class="ty">i32</span> <span class="lb">%a</span>, <span class="lb">%b</span>
+  <span class="kw">br</span> <span class="ty">i1</span> <span class="lb">%cmp</span>, <span class="lb">label %true</span>, <span class="lb">label %false</span>
+<span class="lb">true:</span>
+  <span class="kw">ret</span> <span class="ty">i32</span> <span class="lb">%a</span>   <span class="cm">; %a defined in entry — OK</span>
+<span class="lb">false:</span>
+  <span class="kw">ret</span> <span class="ty">i32</span> <span class="lb">%b</span>
+}`,
+    invalid: `<span class="kw">define</span> <span class="ty">i32</span> <span class="fn">@bad</span>(<span class="ty">i1</span> <span class="lb">%c</span>) {
+<span class="lb">entry:</span>
+  <span class="kw">br</span> <span class="ty">i1</span> <span class="lb">%c</span>, <span class="lb">label %left</span>, <span class="lb">label %merge</span>
+<span class="lb">left:</span>
+  <span class="lb">%val</span> = <span class="kw">add</span> <span class="ty">i32</span> <span class="num">1</span>, <span class="num">2</span>   <span class="cm">; defined only in %left</span>
+  <span class="kw">br</span> <span class="lb">label %merge</span>
+<span class="lb">merge:</span>
+  <span class="kw">ret</span> <span class="ty">i32</span> <span class="lb">%val</span>  <span class="op">; ERROR: %left doesn't dominate %merge</span>
+}`,
+    verifierErrors: [
+      'Instruction does not dominate all uses!',
+      'User: %val = ... in %merge',
+      'Where user is used: %merge'
+    ],
+    whyMatters: 'Dominance is the invariant that allows SSA-based passes to safely reorder and delete instructions. Violating it means the IR cannot be lowered correctly to machine code.'
+  },
+  {
+    id: 'phi',
+    name: 'PHI Node Correctness',
+    category: 'cfg',
+    categoryLabel: 'Control Flow',
+    short: 'PHI nodes must cover all predecessors; only appear at block start.',
+    description: 'A PHI node must list every predecessor of the block it lives in — one (value, predecessor-label) pair per incoming edge. PHI nodes must appear grouped at the very beginning of a basic block, before any non-PHI instructions. The values provided must match the PHI\'s declared type.',
+    valid: `<span class="lb">merge:</span>
+  <span class="lb">%v</span> = <span class="kw">phi</span> <span class="ty">i32</span> [<span class="lb">%a</span>, <span class="lb">%left</span>], [<span class="lb">%b</span>, <span class="lb">%right</span>]
+  <span class="cm">; %merge has exactly two preds: %left, %right</span>
+  <span class="kw">ret</span> <span class="ty">i32</span> <span class="lb">%v</span>`,
+    invalid: `<span class="lb">merge:</span>
+  <span class="lb">%x</span> = <span class="kw">add</span> <span class="ty">i32</span> <span class="num">1</span>, <span class="num">2</span>
+  <span class="lb">%v</span> = <span class="kw">phi</span> <span class="ty">i32</span> [<span class="lb">%a</span>, <span class="lb">%left</span>] <span class="op">; PHI after non-PHI, and</span>
+  <span class="cm">                            </span><span class="op">; missing %right predecessor</span>`,
+    verifierErrors: [
+      'PHI node entries do not match predecessors!',
+      'Incoming value count should be NumPreds',
+      'PHI nodes not grouped at top of basic block'
+    ],
+    whyMatters: 'PHI nodes are the mechanism by which SSA represents data-flow merges. An incorrect PHI corrupts the def-use graph that virtually every optimisation pass relies on.'
+  },
+  {
+    id: 'terminators',
+    name: 'Terminator Instructions',
+    category: 'cfg',
+    categoryLabel: 'Control Flow',
+    short: 'Every basic block must end with exactly one terminator.',
+    description: 'Every basic block must end with a terminator instruction: ret, br, switch, indirectbr, invoke, callbr, resume, catchswitch, catchret, cleanupret, or unreachable. Terminators define the edges of the control flow graph. No instruction after the terminator is permitted, and the block must not be empty.',
+    valid: `<span class="kw">define</span> <span class="ty">void</span> <span class="fn">@loop</span>(<span class="ty">i32</span> <span class="lb">%n</span>) {
+<span class="lb">entry:</span>
+  <span class="kw">br</span> <span class="lb">label %header</span>      <span class="cm">; terminator</span>
+<span class="lb">header:</span>
+  <span class="lb">%i</span> = <span class="kw">phi</span> <span class="ty">i32</span> [<span class="num">0</span>, <span class="lb">%entry</span>], [<span class="lb">%i1</span>, <span class="lb">%body</span>]
+  <span class="lb">%cmp</span> = <span class="kw">icmp</span> slt <span class="ty">i32</span> <span class="lb">%i</span>, <span class="lb">%n</span>
+  <span class="kw">br</span> <span class="ty">i1</span> <span class="lb">%cmp</span>, <span class="lb">label %body</span>, <span class="lb">label %exit</span>  <span class="cm">; terminator</span>
+<span class="lb">body:</span>
+  <span class="lb">%i1</span> = <span class="kw">add</span> <span class="ty">i32</span> <span class="lb">%i</span>, <span class="num">1</span>
+  <span class="kw">br</span> <span class="lb">label %header</span>     <span class="cm">; terminator</span>
+<span class="lb">exit:</span>
+  <span class="kw">ret</span> <span class="ty">void</span>              <span class="cm">; terminator</span>
+}`,
+    invalid: `<span class="kw">define</span> <span class="ty">i32</span> <span class="fn">@missing_ret</span>() {
+<span class="lb">entry:</span>
+  <span class="lb">%x</span> = <span class="kw">add</span> <span class="ty">i32</span> <span class="num">1</span>, <span class="num">2</span>
+  <span class="cm">; No terminator — verifier error</span>
+}`,
+    verifierErrors: [
+      'Basic Block does not have a terminator!',
+      'Terminator found in the middle of a basic block',
+      'Basic block must have a terminator instruction'
+    ],
+    whyMatters: 'Terminators define the CFG edge structure that the backend uses to generate control flow. A missing or misplaced terminator produces an inconsistent graph, causing crashes in downstream passes.'
+  },
+  {
+    id: 'funcsig',
+    name: 'Function Signature Matching',
+    category: 'functions',
+    categoryLabel: 'Functions',
+    short: 'Call sites must match callee signature in arity and types.',
+    description: 'When calling a function, the number of arguments and their types must exactly match the function\'s declared parameter types. Return types must also match. For variadic functions the fixed parameters must match; variadic arguments may differ but must use musttail or appropriate calling conventions.',
+    valid: `<span class="kw">declare</span> <span class="ty">i32</span> <span class="fn">@strlen</span>(<span class="ty">i8*</span>)
+
+<span class="kw">define</span> <span class="ty">i32</span> <span class="fn">@caller</span>(<span class="ty">i8*</span> <span class="lb">%s</span>) {
+  <span class="lb">%len</span> = <span class="kw">call</span> <span class="ty">i32</span> <span class="fn">@strlen</span>(<span class="ty">i8*</span> <span class="lb">%s</span>)
+  <span class="kw">ret</span> <span class="ty">i32</span> <span class="lb">%len</span>
+}`,
+    invalid: `<span class="kw">declare</span> <span class="ty">i32</span> <span class="fn">@foo</span>(<span class="ty">i32</span>, <span class="ty">i32</span>)
+
+<span class="kw">define</span> <span class="ty">void</span> <span class="fn">@bad</span>() {
+  <span class="cm">; Wrong arg type (float) and missing 2nd arg:</span>
+  <span class="lb">%r</span> = <span class="kw">call</span> <span class="ty">i32</span> <span class="fn">@foo</span>(<span class="ty">float</span> <span class="lb">%x</span>)  <span class="op">; ERROR</span>
+  <span class="kw">ret</span> <span class="ty">void</span>
+}`,
+    verifierErrors: [
+      'Call argument types do not match function signature',
+      'Call parameter mismatch',
+      'Calling convention mismatch between call site and declaration'
+    ],
+    whyMatters: 'Signature mismatches cause wrong values to be passed in registers or on the stack per the ABI, leading to memory corruption and silent wrong-code at runtime.'
+  },
+  {
+    id: 'loadstore',
+    name: 'Load/Store Type Consistency',
+    category: 'memory',
+    categoryLabel: 'Memory',
+    short: 'Loaded/stored type must match the pointer\'s element type.',
+    description: 'A load must load a value of the same type as the pointer\'s pointee type. A store must store a value whose type matches the pointer\'s pointee type. Under opaque pointers (LLVM 15+) the type annotation on the instruction itself must be consistent across all accesses. Alignment must also be a power of two.',
+    valid: `<span class="lb">%ptr</span> = <span class="kw">alloca</span> <span class="ty">i32</span>
+<span class="kw">store</span> <span class="ty">i32</span> <span class="num">42</span>, <span class="ty">ptr</span> <span class="lb">%ptr</span>, align <span class="num">4</span>
+<span class="lb">%val</span> = <span class="kw">load</span> <span class="ty">i32</span>, <span class="ty">ptr</span> <span class="lb">%ptr</span>, align <span class="num">4</span>`,
+    invalid: `<span class="lb">%ptr</span> = <span class="kw">alloca</span> <span class="ty">i32</span>
+<span class="cm">; Storing a float into an i32 alloca:</span>
+<span class="kw">store</span> <span class="ty">float</span> <span class="num">3.14</span>, <span class="ty">ptr</span> <span class="lb">%ptr</span>  <span class="op">; type mismatch</span>
+<span class="cm">; Loading with alignment 3 (not power of 2):</span>
+<span class="lb">%v</span> = <span class="kw">load</span> <span class="ty">i32</span>, <span class="ty">ptr</span> <span class="lb">%ptr</span>, align <span class="num">3</span>  <span class="op">; ERROR</span>`,
+    verifierErrors: [
+      'Stored value type does not match pointer type',
+      'Load/Store alignment must be a power of 2',
+      'load result type must be first class type'
+    ],
+    whyMatters: 'Type-punning through incorrect load/store types bypasses the IR type system, breaking alias analysis and producing wrong-code in alias-sensitive optimisations like SROA and GVN.'
+  },
+  {
+    id: 'cfg',
+    name: 'Control Flow Graph Validity',
+    category: 'cfg',
+    categoryLabel: 'Control Flow',
+    short: 'CFG must be internally consistent: predecessors match successors.',
+    description: 'The CFG encoded by terminator instructions must be consistent: every successor block listed by a terminator must have the terminating block listed as one of its predecessors. Self-edges, unreachable blocks, and multiple edges to the same successor are permitted in specific instructions (e.g. switch), but must be reflected accurately in the predecessor list.',
+    valid: `<span class="lb">header:</span>
+  <span class="kw">br</span> <span class="ty">i1</span> <span class="lb">%c</span>, <span class="lb">label %body</span>, <span class="lb">label %exit</span>
+<span class="lb">body:</span>  <span class="cm">; predecessor: %header ✓</span>
+  <span class="kw">br</span> <span class="lb">label %header</span>
+<span class="lb">exit:</span>  <span class="cm">; predecessor: %header ✓</span>
+  <span class="kw">ret</span> <span class="ty">void</span>`,
+    invalid: `<span class="lb">entry:</span>
+  <span class="kw">br</span> <span class="lb">label %b</span>
+<span class="lb">b:</span>
+  <span class="kw">br</span> <span class="lb">label %c</span>  <span class="cm">; successor = %c</span>
+<span class="lb">c:</span>
+  <span class="lb">%v</span> = <span class="kw">phi</span> <span class="ty">i32</span> [<span class="num">1</span>, <span class="lb">%entry</span>]  <span class="op">; ERROR: %b is pred, not %entry</span>
+  <span class="kw">ret</span> <span class="ty">i32</span> <span class="lb">%v</span>`,
+    verifierErrors: [
+      'PHI node has entry for basic block that is not a predecessor',
+      'Missing predecessor entry',
+      'Invalid branch destination'
+    ],
+    whyMatters: 'Passes like loop analysis, dominance tree construction, and code motion all rely on an accurate predecessor/successor representation. Inconsistency causes silent wrong-code or infinite loops in the compiler.'
+  },
+  {
+    id: 'bbstruct',
+    name: 'Basic Block Structure',
+    category: 'cfg',
+    categoryLabel: 'Control Flow',
+    short: 'Blocks must be non-empty and internally ordered correctly.',
+    description: 'A basic block must contain at least one instruction and must end with exactly one terminator. PHI nodes must appear contiguously at the top, non-PHI instructions follow, and the terminator closes the block. Blocks may not interleave PHI and non-PHI instructions.',
+    valid: `<span class="kw">define</span> <span class="ty">i32</span> <span class="fn">@f</span>(<span class="ty">i1</span> <span class="lb">%p</span>, <span class="ty">i32</span> <span class="lb">%a</span>, <span class="ty">i32</span> <span class="lb">%b</span>) {
+<span class="lb">entry:</span>
+  <span class="kw">br</span> <span class="ty">i1</span> <span class="lb">%p</span>, <span class="lb">label %t</span>, <span class="lb">label %f</span>
+<span class="lb">t:</span>
+  <span class="kw">br</span> <span class="lb">label %end</span>
+<span class="lb">f:</span>
+  <span class="kw">br</span> <span class="lb">label %end</span>
+<span class="lb">end:</span>
+  <span class="lb">%v</span> = <span class="kw">phi</span> <span class="ty">i32</span> [<span class="lb">%a</span>, <span class="lb">%t</span>], [<span class="lb">%b</span>, <span class="lb">%f</span>]  <span class="cm">; PHI first</span>
+  <span class="kw">ret</span> <span class="ty">i32</span> <span class="lb">%v</span>                              <span class="cm">; terminator last</span>
+}`,
+    invalid: `<span class="lb">mixed:</span>
+  <span class="lb">%x</span> = <span class="kw">add</span> <span class="ty">i32</span> <span class="lb">%a</span>, <span class="num">1</span>         <span class="cm">; non-PHI</span>
+  <span class="lb">%v</span> = <span class="kw">phi</span> <span class="ty">i32</span> [<span class="lb">%a</span>, <span class="lb">%pred</span>]  <span class="op">; ERROR: PHI after non-PHI</span>
+  <span class="kw">ret</span> <span class="ty">i32</span> <span class="lb">%v</span>`,
+    verifierErrors: [
+      'PHI nodes not grouped at top of basic block',
+      'Basic block must end with a terminator',
+      'Basic block is empty'
+    ],
+    whyMatters: 'Basic block structure is assumed by virtually every analysis pass. An incorrectly structured block will corrupt iterators inside passes, causing crashes or incorrect transformations.'
+  },
+  {
+    id: 'rettype',
+    name: 'Return Type Consistency',
+    category: 'functions',
+    categoryLabel: 'Functions',
+    short: 'Return instruction value type must match function\'s declared return type.',
+    description: 'The value returned by a ret instruction must have exactly the same type as the function\'s declared return type. A void function must use ret void. A non-void function must return a value of the matching type. Implicit conversions do not exist in IR.',
+    valid: `<span class="kw">define</span> <span class="ty">i64</span> <span class="fn">@identity</span>(<span class="ty">i64</span> <span class="lb">%x</span>) {
+  <span class="kw">ret</span> <span class="ty">i64</span> <span class="lb">%x</span>  <span class="cm">; type matches declaration</span>
+}
+
+<span class="kw">define</span> <span class="ty">void</span> <span class="fn">@nothing</span>() {
+  <span class="kw">ret</span> <span class="ty">void</span>   <span class="cm">; void matches void</span>
+}`,
+    invalid: `<span class="kw">define</span> <span class="ty">i32</span> <span class="fn">@wrong</span>() {
+  <span class="kw">ret</span> <span class="ty">i64</span> <span class="num">0</span>  <span class="op">; ERROR: i64 ≠ i32</span>
+}
+
+<span class="kw">define</span> <span class="ty">i32</span> <span class="fn">@also_wrong</span>() {
+  <span class="kw">ret</span> <span class="ty">void</span>  <span class="op">; ERROR: non-void function returns void</span>
+}`,
+    verifierErrors: [
+      'Function return type does not match operand type of return inst!',
+      'Non-void function does not return a value',
+      'Function return type is void but return instruction has value'
+    ],
+    whyMatters: 'The calling convention dictates where the return value is placed based on its type. A type mismatch corrupts register allocation and produces ABI-violating code that silently breaks callers.'
+  }
+];
+
+function hl(code) { return code; }
+
+function renderTable() {
+  const tbody = document.getElementById('table-body');
+  tbody.innerHTML = '';
+  CONSTRAINTS.forEach((c, i) => {
+    const tr = document.createElement('tr');
+    tr.dataset.id = c.id;
+    tr.dataset.category = c.category;
+    tr.innerHTML = `
+      <td>${c.name}</td>
+      <td>${c.short}</td>
+      <td><span class="tag tag-${catColor(c.category)}">${c.categoryLabel}</span></td>
+      <td style="color:var(--text3);font-family:var(--mono);font-size:11px;white-space:nowrap">▸ expand</td>
+    `;
+    tr.onclick = () => toggleRow(tr, c);
+    tbody.appendChild(tr);
+
+    const exp = document.createElement('tr');
+    exp.className = 'expand-row row-hidden';
+    exp.dataset.for = c.id;
+    exp.innerHTML = `<td colspan="4"><div>
+      <p style="font-size:13px;color:var(--text2);line-height:1.7;margin-bottom:1rem">${c.description}</p>
+      <div class="two-col">
+        <div class="code-block valid">
+          <h5>✓ Valid IR</h5>
+          <pre>${c.valid}</pre>
+        </div>
+        <div class="code-block invalid">
+          <h5>✗ Invalid IR</h5>
+          <pre>${c.invalid}</pre>
+        </div>
+      </div>
+      <div class="why-matters">
+        <strong>Why it matters</strong>
+        <p>${c.whyMatters}</p>
+      </div>
+    </div></td>`;
+    tbody.appendChild(exp);
+  });
+}
+
+function catColor(cat) {
+  const map = {ssa:'purple',types:'blue',cfg:'teal',memory:'amber',functions:'green'};
+  return map[cat]||'blue';
+}
+
+function toggleRow(tr, c) {
+  const expRow = document.querySelector(`.expand-row[data-for="${c.id}"]`);
+  const isOpen = !expRow.classList.contains('row-hidden');
+  document.querySelectorAll('.expand-row').forEach(r => r.classList.add('row-hidden'));
+  document.querySelectorAll('#constraint-table tbody tr:not(.expand-row)').forEach(r => {
+    r.classList.remove('expanded');
+    r.querySelector('td:last-child').textContent = '▸ expand';
+  });
+  if (!isOpen) {
+    expRow.classList.remove('row-hidden');
+    tr.classList.add('expanded');
+    tr.querySelector('td:last-child').textContent = '▾ collapse';
+  }
+}
+
+function filterTable() {
+  const q = document.getElementById('search-input').value.toLowerCase();
+  const cat = document.getElementById('category-filter').value;
+  let visible = 0;
+  document.querySelectorAll('#table-body tr:not(.expand-row)').forEach(tr => {
+    const id = tr.dataset.id;
+    const c = CONSTRAINTS.find(x => x.id === id);
+    const match = (!q || c.name.toLowerCase().includes(q) || c.short.toLowerCase().includes(q) || c.description.toLowerCase().includes(q))
+                && (!cat || c.category === cat);
+    tr.style.display = match ? '' : 'none';
+    const expRow = document.querySelector(`.expand-row[data-for="${id}"]`);
+    if (!match) expRow.classList.add('row-hidden');
+    if (match) visible++;
+  });
+  document.getElementById('no-results').style.display = visible === 0 ? 'block' : 'none';
+}
+
+function renderExplorer() {
+  const list = document.getElementById('explorer-list');
+  CONSTRAINTS.forEach(c => {
+    const btn = document.createElement('button');
+    btn.className = 'constraint-btn';
+    btn.dataset.id = c.id;
+    btn.innerHTML = `<span class="dot"></span>${c.name}`;
+    btn.onclick = () => showExplorer(c.id);
+    list.appendChild(btn);
+  });
+}
+
+function showExplorer(id) {
+  const c = CONSTRAINTS.find(x => x.id === id);
+  document.querySelectorAll('.constraint-btn').forEach(b => b.classList.toggle('active', b.dataset.id === id));
+  const content = document.getElementById('explorer-content');
+  content.innerHTML = `<div class="explorer-detail">
+    <h2>${c.name}</h2>
+    <div class="meta">
+      <span class="tag tag-${catColor(c.category)}">${c.categoryLabel}</span>
+    </div>
+    <div class="detail-section">
+      <h4>Description</h4>
+      <p>${c.description}</p>
+    </div>
+    <div class="detail-section">
+      <h4>Examples</h4>
+      <div class="examples-grid">
+        <div class="code-block valid">
+          <h5>✓ Valid LLVM IR</h5>
+          <pre>${c.valid}</pre>
+        </div>
+        <div class="code-block invalid">
+          <h5>✗ Invalid LLVM IR</h5>
+          <pre>${c.invalid}</pre>
+        </div>
+      </div>
+    </div>
+    <div class="detail-section">
+      <h4>Common verifier errors</h4>
+      <div class="verifier-errors">
+        ${c.verifierErrors.map(e => `<div class="verifier-error">$ opt --verify &lt;file.ll&gt;<br>error: ${e}</div>`).join('')}
+      </div>
+    </div>
+    <div class="why-matters">
+      <strong>Why it matters</strong>
+      <p>${c.whyMatters}</p>
+    </div>
+  </div>`;
+}
+
+function toggleCard(header) {
+  const card = header.closest('.card');
+  card.classList.toggle('open');
+}
+
+document.querySelectorAll('nav a').forEach(a => {
+  a.addEventListener('click', e => {
+    e.preventDefault();
+    document.querySelectorAll('nav a').forEach(x => x.classList.remove('active'));
+    a.classList.add('active');
+    document.querySelectorAll('.section').forEach(s => s.classList.remove('active'));
+    document.getElementById(a.dataset.section).classList.add('active');
+    window.scrollTo(0,0);
+  });
+});
+
+renderTable();
+renderExplorer();
+</script>
+</body>
+</html>

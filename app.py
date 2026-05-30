@@ -45,6 +45,11 @@ def analysis():
     return render_template("analysis.html")
 
 
+@app.route("/research")
+def research():
+    return render_template("research.html")
+
+
 @app.route("/api/generate-ir", methods=["POST"])
 def api_generate_ir():
     if "c_file" not in request.files:
