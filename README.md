@@ -2,6 +2,59 @@
 
 A Flask web application for **LLVM IR differential compiler testing**. Upload C source, generate LLVM IR with `clang`, craft LLM mutation prompts, validate mutated IR with the LLVM verifier, and compare execution at `-O0` vs `-O3` using `lli`. All results are stored in SQLite and visualized on a live Analysis dashboard.
 
+## Prototype Workflow Screenshots
+
+### 1. Test Lab – Uploading and Generating LLVM IR Mutation Prompt
+
+![Test Lab Upload](images/one.png)
+
+This screen shows the main workflow of the LLVM Differential Testing prototype.  
+Users can upload a C source file, automatically generate LLVM IR, and select a mutation strategy such as arithmetic insertion, PHI node insertion, branch mutation, or operand swapping.  
+The system then generates an LLM-ready prompt that instructs the model to mutate the LLVM IR while preserving structural validity constraints such as SSA correctness and type consistency.
+
+---
+
+### 2. Validation and Differential Testing Results
+
+![Validation Results](images/two.png)
+
+After the mutated LLVM IR is pasted back into the system, the framework validates the IR using LLVM verification passes and executes differential compiler testing using multiple optimization levels (e.g., `-O0` and `-O3`).  
+The dashboard reports whether the generated IR is valid and whether compiler outputs match or expose interesting inconsistencies that may indicate optimization-related bugs.
+
+---
+
+### 3. Analysis Dashboard – Aggregated Statistics
+
+![Analysis Dashboard](images/three.png)
+
+The analysis page aggregates statistics from all executed test runs.  
+It provides metrics such as:
+- Total number of generated test cases
+- LLVM IR validity rate
+- Mismatch rate between compiler optimization outputs
+- Number of potentially interesting compiler bug cases
+
+The charts also visualize:
+- Valid vs invalid mutations
+- Mutation-type effectiveness
+- Error distribution
+- Test execution trends over time
+
+---
+
+### 4. Mutation Quality and Key Findings
+
+![Mutation Insights](images/four.png)
+
+This section summarizes experimental observations from the prototype.  
+The dashboard highlights:
+- Which mutation strategies produce the highest percentage of valid LLVM IR
+- Common causes of invalid IR generation
+- Frequency of compiler output mismatches
+- Overall effectiveness of LLM-guided mutation generation
+
+The results help evaluate whether LLM-generated LLVM IR mutations can contribute meaningful test cases beyond traditional fuzzing techniques.
+
 ## Prerequisites
 
 - **Python 3.10+** (tested with Python 3.11–3.14)
