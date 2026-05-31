@@ -149,6 +149,40 @@ int main(void) {
 
 Upload it on the Test Lab page to try the full pipeline without writing C code first.
 
+## Automated batch testing (Gemini + Flask)
+
+`automate_tests.py` drives the **same Flask APIs** as the web UI. Verification, differential testing, SQLite history, and Analysis charts all use the running app — only IR mutation is done via the Gemini API.
+
+**Prerequisites:**
+
+1. Flask app running: `python app.py`
+2. API key: `export GEMINI_API_KEY=your_key` (or `GOOGLE_API_KEY`)
+3. Optional: `export GEMINI_MODEL=gemini-2.5-flash` (default)
+4. Optional: `export DIFFTESTER_URL=http://127.0.0.1:5000` if not on default port
+
+**Run all six mutation types for one C file:**
+
+```bash
+python automate_tests.py uploads/test_sample.c
+```
+
+**Options:**
+
+```bash
+python automate_tests.py program.c --url http://127.0.0.1:5001
+python automate_tests.py program.c --model gemini-2.0-flash --delay 2
+python automate_tests.py program.c --mutations add_arithmetic dead_code
+```
+
+**Flow per mutation:**
+
+1. `POST /api/generate-ir` — once, from your `.c` file  
+2. `POST /api/get-prompt` — prompt from Flask templates  
+3. Gemini `generateContent` — mutated IR  
+4. `POST /api/validate-and-test` — verifier + O0/O3 + DB insert  
+
+Results appear on **Test Lab → History** and **Analysis** like manual runs.
+
 ## Troubleshooting
 
 | Issue | Fix |
