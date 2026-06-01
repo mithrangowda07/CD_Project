@@ -71,10 +71,10 @@
   <textarea id="mutated-ir-input" class="mutated-textarea" placeholder="Paste the mutated LLVM IR from your LLM here..."></textarea>
   <button type="button" class="btn btn-primary" id="run-test-btn">Run Validation &amp; Testing</button>
   <div id="status-bar" class="status-bar hidden">
-    <div class="phase" data-phase="verify">Verifying IR...</div>
-    <div class="phase" data-phase="o0">Running O0...</div>
-    <div class="phase" data-phase="o3">Running O3...</div>
-    <div class="phase" data-phase="compare">Comparing...</div>
+    <div class="phase pending" data-phase="verify">Verifying IR…</div>
+    <div class="phase pending" data-phase="o0">Running O0…</div>
+    <div class="phase pending" data-phase="o3">Running O3…</div>
+    <div class="phase pending" data-phase="compare">Comparing…</div>
   </div>
 </section>
 

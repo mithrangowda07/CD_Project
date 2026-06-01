@@ -23,6 +23,12 @@ const MUTATION_SHORT = {
 let charts = [];
 
 document.addEventListener('DOMContentLoaded', async () => {
+  if (typeof Chart !== 'undefined') {
+    Chart.defaults.color = '#8b9cb3';
+    Chart.defaults.borderColor = '#2a3548';
+    Chart.defaults.plugins.legend.labels.color = '#e8edf5';
+  }
+
   try {
     const res = await fetch('/api/stats');
     const data = await res.json();
@@ -104,12 +110,12 @@ function renderValidityChart(stats) {
       const validPct = stats.valid_pct;
       ctx.save();
       ctx.font = 'bold 1.25rem sans-serif';
-      ctx.fillStyle = '#1e293b';
+      ctx.fillStyle = '#e8edf5';
       ctx.textAlign = 'center';
       ctx.textBaseline = 'middle';
       ctx.fillText(`${validPct}%`, width / 2, height / 2 - 8);
-      ctx.font = '0.75rem sans-serif';
-      ctx.fillStyle = '#64748b';
+      ctx.font = '0.75rem Inter, sans-serif';
+      ctx.fillStyle = '#8b9cb3';
       ctx.fillText(`${stats.valid}/${total} valid`, width / 2, height / 2 + 14);
       ctx.restore();
     },

@@ -164,23 +164,49 @@ function copyToClipboard(text, anchorEl) {
   });
 }
 
-function startStatusBarAnimation() {
+const STATUS_PHASE_LABELS = {
+  verify: { pending: 'Verifying IR…', done: 'IR verified' },
+  o0: { pending: 'Running O0…', done: 'O0 complete' },
+  o3: { pending: 'Running O3…', done: 'O3 complete' },
+  compare: { pending: 'Comparing…', done: 'Comparison done' },
+};
+
+function setPhaseLabel(phaseEl, state) {
+  const key = phaseEl.dataset.phase;
+  const labels = STATUS_PHASE_LABELS[key];
+  if (labels) phaseEl.textContent = labels[state];
+}
+
+function resetStatusBar() {
   const bar = document.getElementById('status-bar');
   bar?.classList.remove('hidden');
-  const phases = bar?.querySelectorAll('.phase') || [];
-  let idx = 0;
-  phases.forEach((p, i) => {
-    p.classList.remove('active', 'done');
-    if (i === 0) p.classList.add('active');
+  bar?.querySelectorAll('.phase').forEach((p, i) => {
+    p.classList.remove('active', 'done', 'pending');
+    p.classList.add('pending');
+    setPhaseLabel(p, 'pending');
+    if (i === 0) {
+      p.classList.remove('pending');
+      p.classList.add('active');
+    }
   });
+}
+
+function startStatusBarAnimation() {
+  resetStatusBar();
+  const phases = document.querySelectorAll('#status-bar .phase');
+  let idx = 0;
 
   if (statusBarInterval) clearInterval(statusBarInterval);
   statusBarInterval = setInterval(() => {
+    if (idx >= phases.length) return;
+    const current = phases[idx];
+    current.classList.remove('active');
+    current.classList.add('done');
+    setPhaseLabel(current, 'done');
+    idx += 1;
     if (idx < phases.length) {
-      phases[idx].classList.remove('active');
-      phases[idx].classList.add('done');
-      idx += 1;
-      if (idx < phases.length) phases[idx].classList.add('active');
+      phases[idx].classList.remove('pending');
+      phases[idx].classList.add('active');
     }
   }, 1500);
 }
@@ -191,8 +217,9 @@ function completeStatusBar() {
     statusBarInterval = null;
   }
   document.querySelectorAll('#status-bar .phase').forEach((p) => {
-    p.classList.remove('active');
+    p.classList.remove('active', 'pending');
     p.classList.add('done');
+    setPhaseLabel(p, 'done');
   });
 }
 
