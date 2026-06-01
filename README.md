@@ -55,6 +55,26 @@ The dashboard highlights:
 
 The results help evaluate whether LLM-generated LLVM IR mutations can contribute meaningful test cases beyond traditional fuzzing techniques.
 
+## Documentation
+
+| Document | Description |
+|----------|-------------|
+| [DESIGN.md](DESIGN.md) | Architecture, goals, alternatives |
+| [IMPLEMENTATION.md](IMPLEMENTATION.md) | LLVM toolchain: verify, O0/O3, differential test |
+| [SRC.md](SRC.md) | Source files and module map |
+| [SCRIPTS.md](SCRIPTS.md) | `build.sh`, `run.sh`, `automate_tests.py` — how to run |
+| [TESTCASES.md](TESTCASES.md) | Bundled `uploads/test_cases/*.c` |
+
+**Quick run:**
+
+```bash
+./build.sh          # setup
+./run.sh            # manual Flask UI → http://localhost:5000
+./run.sh batch      # automatic: all test cases + Gemini (needs GEMINI_API_KEY)
+```
+
+Automatic tests use **`automate_tests.py`**; manual tests use the **Test Lab** web UI. See [SCRIPTS.md](SCRIPTS.md).
+
 ## Prerequisites
 
 - **Python 3.10+** (tested with Python 3.11–3.14)
