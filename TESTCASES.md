@@ -9,7 +9,11 @@ uploads/test_cases/
 ├── test3.c
 ├── test4.c
 ├── test5.c
-└── test6.c
+├── test6.c
+├── test7.c
+├── test8.c
+├── test9.c
+└── test10.c
 ```
 
 They are **educational-style** programs with deterministic `printf` output and no `scanf`, so `lli` comparisons at `-O0` vs `-O3` are stable for valid IR.
@@ -24,6 +28,10 @@ They are **educational-style** programs with deterministic `printf` output and n
 | `test4.c` | 2D matrix | Nested loops, 2D array indexing |
 | `test5.c` | Grades / branches | Arrays, `if`/`else`, string literal |
 | `test6.c` | Bubble sort | Nested loops, swaps, 10-element array |
+| `test7.c` | Fibonacci loop | Array tracking, recurrence relation |
+| `test8.c` | Linear search | Iteration search, statistical min/max/parity |
+| `test9.c` | Text processing | String iteration, character mutation, counters |
+| `test10.c` | Matrix multiply | 2D nested loops, arithmetic dot product |
 
 ## Per-file description
 
@@ -57,6 +65,25 @@ They are **educational-style** programs with deterministic `printf` output and n
 - Ten elements, O(n²) sort with swaps.
 - Largest bundled case; more basic blocks and compares.
 
+### `test7.c` — Fibonacci loop
+
+- Computes first 15 Fibonacci values using an array accumulator.
+- Validates loop optimizations and recurrence value merging.
+
+### `test8.c` — Linear search & dataset stats
+
+- Scans a 12-element static array for a target value.
+- Computes minimum, maximum, even count, and odd count during iteration.
+
+### `test9.c` — Text analysis & conversion
+
+- Iterates through a fixed sentence string, transforming uppercase to lowercase.
+- Counts vowels, consonants, spaces, and digit characters.
+
+### `test10.c` — Matrix multiplication
+
+- Performs matrix multiplication of a 3x2 matrix and a 2x3 matrix, outputting a 3x3 result.
+- Rich Control Flow Graph (CFG) structure with three levels of nested loops.
 ## How to run test cases
 
 ### 1. Automatic — all six files (recommended for regression)

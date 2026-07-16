@@ -41,7 +41,7 @@ MUTATION_TYPES = (
 )
 
 DEFAULT_BASE_URL = "http://127.0.0.1:5000"
-DEFAULT_GEMINI_MODEL = "gemini-2.5-flash"
+DEFAULT_GEMINI_MODEL = "gemini-2.0-flash-001"
 GEMINI_API_BASE = (
     "https://generativelanguage.googleapis.com/v1beta/models"
 )
